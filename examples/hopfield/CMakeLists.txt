@@ -3,8 +3,9 @@ ADD_DEFINITIONS(-DNDEBUG)
 
 LINK_DIRECTORIES (
 	${PROJECT_BINARY_DIR}/opencog/atomspace
-	${PROJECT_BINARY_DIR}/opencog/server
-	${PROJECT_BINARY_DIR}/opencog/dynamics/attention
+	${PROJECT_BINARY_DIR}/opencog/truthvalue
+	${PROJECT_BINARY_DIR}/opencog/cogserver/server
+	${PROJECT_BINARY_DIR}/opencog/attention
 )
 
 # The atom_types.h file is written to the build directory
@@ -12,11 +13,6 @@ INCLUDE_DIRECTORIES (
 	${CMAKE_BINARY_DIR}
 	${ODBC_INCLUDE_DIRS}
 )
-
-IF (XMLRPC_FOUND AND CURL_FOUND)
-	SET (HOPFIELD_UBI_SRC HopfieldUbigrapher.cc)
-	SET (PROJECT_UBI_LIB ubigraph ${XMLRPC_LIBRARIES})
-ENDIF (XMLRPC_FOUND AND CURL_FOUND)
 
 ADD_EXECUTABLE (hopfield
 	HopfieldDemo.cc
@@ -31,8 +27,7 @@ ADD_EXECUTABLE (hopfield
 ADD_DEPENDENCIES(hopfield attention_atom_types)
 
 TARGET_LINK_LIBRARIES (hopfield
+	${ATOMSPACE_LIBRARIES}
 	server
 	attention
-	${PROJECT_UBI_LIB}
-	${EXPAT_LIBRARIES}
 )

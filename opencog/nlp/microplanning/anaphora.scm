@@ -1,6 +1,14 @@
-; loading additional dependency
-(load "helpers.scm")
-(load "anaphora-nouns-list.scm")
+;
+;
+; Loading additional dependencies
+; Attention: we need to `include`, not `load` helpers.scm because it
+; contains a macro definition. This macro causes unit-test failures,
+; ... Hmm ... because the file compile step is broken? is this due to
+; a guile bug??  Anyway, for guile-2.1, taken from git, as of March
+; 2016, saying `load` here fails.  Its tied to the set-values! macro.
+;
+(include-from-path "opencog/nlp/microplanning/helpers.scm")
+(load-from-path "opencog/nlp/microplanning/anaphora-nouns-list.scm")
 
 ; =======================================================================
 ; Main anaphora insertion functions
@@ -60,7 +68,7 @@
 							      )
 								; do not want a copy of the link for every changes to the node, just want one
 								(if (not (equal? (get-orig-link ni) old-link))
-									(cog-delete old-link)
+									(cog-extract old-link)
 								)
 							      
 								(mod-link results-set (get-chunk-index ni) (get-link-index ni) new-link)
@@ -84,7 +92,7 @@
 						(mod-chunk results-set index (get-chunk inputs-set index))
 					)
 				
-					(cog-delete temp-set-link)
+					(cog-extract temp-set-link)
 				)
 			)
 		)

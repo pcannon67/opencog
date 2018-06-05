@@ -1,55 +1,34 @@
 ;
 ; nlp-utils.scm
 ;
+;;; Commentary:
+;
 ; Assorted NLP utilities.  Operations include:
-; -- looping over all sentences in a document
-; -- looping over all parses of a sentence (map-parses)
-; -- looping over all words in a sentence (map-word-node)
-; -- looping over all RelEx relations
-; -- get word of word instance. (word-inst-get-word)
-; -- get part-of-speech, lemma of word.
-; -- get prepositions
-; -- get word senses
+; -- getting the various parses of a sentence
+; -- getting the words in a parse
+; -- getting assorted word properties
 ; -- deleting all atoms pertaining to a sentence
 ;
 ; The function names that can be found here are:
-; -- map-parses   Call proceedure on every parse of the sentence.
-; -- map-word-instances   Call proc on each word-instance of parse.
-; -- map-word-node        Call proc on the word-node associated to word-inst.
 ; -- document-get-sentences Get senteces in document.
 ; -- sentence-get-parses    Get parses of a sentence.
+; -- sentence-get-utterance-type  Get the speech act of a sentence.
 ; -- sent-list-get-parses   Get parses of a list of sentences.
+; -- sent-get-words-in-order  Get all words occuring in a sentence in order.
+; -- sent-get-interp Get all the InterpretationNodes of a sentence.
 ; -- parse-get-words        Get all words occuring in a parse.
 ; -- parse-get-words-in-order  Get all words occuring in a parse in order.
-; -- parse-get-relations    Get all RelEx relations in a parse.
-; -- parse-get-r2l-outputs  Get all R2L outputs in a parse.
-; -- interp-get-r2l-outputs Get all R2L outputs in an Interpretation.
+; -- parse-get-links        Get all LG links in a parse.
 ; -- interp-get-parse       Get the Interpretation of a Parse.
 ; -- word-inst-get-parse    Return the ParseNode associated with word-inst.
-; -- word-inst-get-number   Return the NumberNode associated with word-inst. 
-; -- word-inst-get-word   Return the WordNode associated with word-inst.
-; -- word-inst-get-word-str  Return the word string assoc with word-inst.
-; -- word-inst-get-lemma  Return the lemma of word instance.
-; -- word-inst-get-attr   Return attributes of word instance.
-; -- word-inst-get-pos    Return part-of-speech (POS) of word instance.
-; -- word-inst-match-pos? Does word-inst have POS?
-; -- word-inst-is-noun?   Is word instance a noun?
-; -- word-inst-is-verb?   Is word instance a verb?
-; -- word-inst-get-relations       Get RelEx relations involving word-inst.
-; -- word-inst-get-head-relations  Get relations with word-inst as head.
-; -- word-inst-get-prep-relations  Get prepositional relations for word-inst.
-; -- word-inst-filter-relex-rels   Get filtered set of RelEx relations.
-; -- verb-inst-get-relex-rels      Get relations for a verb.
-; -- noun-inst-get-relex-modifiers Get relations for a noun.
-; -- noun-inst-get-prep-rels       Get prep relations for noun.
-; -- word-inst-get-subscript-str   Get link-grammar subscript for word-inst.
-; -- word-inst-get-subscripted-word-str Get LG subscripted word string.
+; -- word-inst-get-number   Return the NumberNode associated with word-inst.
+; -- word-inst-get-word     Return the WordNode associated with word-inst.
+; -- word-inst-get-links    Get all LG links involving word-inst.
 ; -- word-inst-get-senses   Get word senses associated with word.
 ; -- word-inst-sense-score  Get ranking score for word-inst & word-sense.
+; -- word-inst-get-cset     Get the connector-set used for a word-inst.
 ; -- word-inst-get-disjunct Get the disjunct (LgAnd) used for a word-inst.
-; -- word-inst-get-source-conn     Get the set of connectors word-inst linked to.
-; -- relation-get-dependent Get dependent part of a relation.
-; -- delete-sentence        Delete all atoms associated with sentence.
+; -- delete-sentence        Delete all atoms associated with a sentence.
 ; -- delete-sentences       Delete all atoms that occur in sentences.
 ;
 ;
@@ -59,661 +38,454 @@
 ; algos to learn new ways of processing. Many/most of the utilities below
 ; could be implemented by using pattern maching. Code that depends on these
 ; utilities should be converted to use pattern matching as soon as reasonable.
-; Code that cannot be converted will eventually (in the distant future ...) 
+; Code that cannot be converted will eventually (in the distant future ...)
 ; become obsolete.
-; 
+;
 ; Copyright (c) 2008, 2009, 2013 Linas Vepstas <linasvepstas@gmail.com>
 ; Copyright (c) 2015 OpenCog Foundation
 ;
 
-(use-modules (ice-9 receive))
+(use-modules (srfi srfi-1))
+(use-modules (opencog))
 
 ; ---------------------------------------------------------------------
-; map-parses   Call proceedure on every parse of the sentence.
-;
-; map-parses proc sent
-; Call proceedure 'proc' on every parse of the sentence 'sent' 
-; 
-; Expected input is a SentenceNode, or possibly a list of SentenceNodes.
-; Each SentenceNode serves as an anchor to all of the parses of a sentence.
-; It is connected via ParseLink's to each of the individual parses of the
-; sentence. This routine backtracks over the ParseNode to find these.
-;
-; The recursion will stop if proc returns something other than #f. This
-; routine returns the last value that stopped the recursion. (In other
-; words, this is not really a map, but something kind-of weird -- XXX
-; this should probably be fixed -- TODO)
-;
-(define (map-parses proc sent-or-list)
-	(cog-map-chase-links-chk 'ParseLink 'ParseNode
-		proc sent-or-list 'SentenceNode)
-)
+(define-public (document-get-sentences DOCO)
+"
+  document-get-sentences DOCO -- Get senteces in document DOCO
 
-; Same as above, but multi-threaded -- each parse dispatched to its own
-; thread, on a distinct CPU.
-(define (parallel-map-parses proc sent-or-list)
-	(cog-par-chase-links-chk 'ParseLink 'ParseNode
-		proc sent-or-list 'SentenceNode)
-)
-
-; ---------------------------------------------------------------------
-; map-word-instances   Call proc on each word-instance of parse.
-;
-; map-word-instances proc parse
-; Call proceedure 'proc' on each word-instance of 'parse'
-;
-; Expected input is a ParseNode or a list of ParseNodes. These serve
-; as anchors to all of the word instances in a parse. The word instances
-; can be found by back-tracking through the WordInstanceLink to the
-; individual words, which is what this method does.
-; 
-(define (map-word-instances proc parse-or-list) 
-	(cog-map-chase-links-chk 'WordInstanceLink 'WordInstanceNode
-		proc parse-or-list 'ParseNode)
-)
-
-; ---------------------------------------------------------------------
-; map-word-node        Call proc on the word-node associated to word-inst.
-;
-; map-word-node proc word-inst
-; Call proceedure 'proc' on the word-node associated to 'word-inst'
-;
-; Expected input is a WordInstanceNode, which serves as an anchor
-; to a word instance. The WordInstanceNode is connnected via a ReferenceLink
-; to the actual word node.
-;
-(define (map-word-node proc word-inst) 
-	(cog-map-chase-links-chk 'ReferenceLink 'WordNode
-		proc word-inst 'WordInstanceNode)
-)
-
-; ---------------------------------------------------------------------
-; document-get-sentences Get senteces in document.
-;
-; document-get-sentences doco
-;
-; Given a document, return a list of sentences in that document
-; Throws an error if doco is not a DocumentNode
-;
-(define (document-get-sentences doco)
-	(if (eq? (cog-type doco) 'DocumentNode)
-		(cog-get-reference doco)
+  Given a document DOCO, return a list of sentences in that document.
+  Throws an error if DOCO is not a DocumentNode
+"
+	(if (eq? (cog-type DOCO) 'DocumentNode)
+		(cog-get-reference DOCO)
 		(throw 'wrong-atom-type 'document-get-sentences
-			"Error: expecting DocumentNode:" doco)
+			"Error: expecting DocumentNode:" DOCO)
 	)
 )
 
 ; ---------------------------------------------------------------------
-; sentence-get-parses    Get parses of a sentence.
-;
-; sentence-get-parses sent-node
-;
-; Given a sentence, return a list of parses in that sentence
-; Basically, chase a ParseLink to a ParseNode
-; Throws an error if sent-node is not a SentenceNode
-;
-(define (sentence-get-parses sent-node)
+(define-public (sentence-get-parses sent-node)
+"
+  sentence-get-parses    Get parses of a sentence.
+
+  sentence-get-parses sent-node
+
+  Given a sentence, return a list of parses in that sentence
+  Basically, chase a ParseLink to a ParseNode
+  Throws an error if sent-node is not a SentenceNode
+"
 	(cog-chase-link-chk 'ParseLink 'ParseNode sent-node 'SentenceNode)
 )
 
 ; -----------------------------------------------------------------------
-; sent-list-get-parses   Get parses of a list of sentences.
-;
-; Given a list of sentences, return a list of parses of those sentences.
-; That is, given a List of SentenceNode's, return a list of ParseNode's
-; associated with those sentences.
+(define-public (sent-list-get-parses sent-list)
+"
+  sent-list-get-parses   Get parses of a list of sentences.
 
-(define (sent-list-get-parses sent-list)
+  Given a list of sentences, return a list of parses of those sentences.
+  That is, given a List of SentenceNode's, return a list of ParseNode's
+  associated with those sentences.
+"
 	(concatenate! (map sentence-get-parses sent-list))
 )
 
+;------------------------------------------------------------------
+(define-public (sentence-get-utterance-type sent)
+"
+  sentence-get-utterance-type SENT -- Check the utterance speech act type
+
+  Expect SENT to be (SentenceNode \"sentence@45c470a6-29...\")
+  Will return (DefinedLinguisticConceptNode ACT) where ACT is
+  one of DeclarativeSpeechAct, InterrogativeSpeechAct,
+  TruthQuerySpeechAct, etc...
+"
+	; XXX TODO (1) this could be converted into a simple GetLink
+	; and probably should be. (2) There should be a syntax for GetLink
+	; that is lest verbose, and closer in style to what is written
+	; below. Viz, it should be posible to write GetLink's as a sequence
+	; of chases.
+
+	; parse will be (ParseNode "sentence@a6_parse_0")
+	(define parse (car (cog-chase-link 'ParseLink 'ParseNode sent)))
+
+	; interp will be (InterpretationNode "sentence@a610_interpretation_$X")
+	(define interp (car
+		(cog-chase-link 'InterpretationLink 'InterpretationNode parse)))
+
+	; act-type will be (DefinedLinguisticConceptNode "DeclarativeSpeechAct")
+	(define act-type (cog-chase-link
+		'InheritanceLink 'DefinedLinguisticConceptNode interp))
+
+	; Return act-type
+	act-type
+)
 
 ; ---------------------------------------------------------------------
-; parse-get-words - Given a parse, return a list of all words in the parse
-;
-; Given a parse, return all word instances in arbitary order
-; This version is faster than the in order version.
-;
-(define (parse-get-words parse-node)
+(define-public (sent-get-words-in-order sent-node)
+"
+  sent-get-words-in-order - Given a sentence, return a list of all
+  of the word-instances in each parse, in order.
+
+  Given a sentence, return all word instances in order
+"
+	(map parse-get-words-in-order (sentence-get-parses sent-node))
+)
+
+; ---------------------------------------------------------------------
+
+(define-public (parse-get-links parse-node)
+"
+  parse-get-links    Get all LG links in a parse.
+
+  Given a parse, return a list of all LG links in that parse, i.e.
+  the EvaluationLinks of the form
+
+     EvaluationLink
+        LinkGrammarRelationshipNode 'foo'
+        ListLink
+           WordInstanceNode 'dog@12345'
+           WordInstanceNode 'toy@6789'
+
+"
+	; Get a list of word-instances in the parse.
+	; Get a list of lists of links for each word-instance.
+	; concatenate! will reduce the list of lists to a plain list.
+	; Remove duplicates
+	(delete-duplicates!
+		(concatenate!
+			(map word-inst-get-links
+				(parse-get-words parse-node))))
+)
+
+; ---------------------------------------------------------------------
+(define-public (sent-get-interp sent-node)
+"
+  sent-get-interp - Given a SentenceNode returns a list of InterpretationNodes
+
+  XXX fix-me -- might this not be parse-dependent???
+"
+    (parse-get-interp (car (sentence-get-parses sent-node)))
+)
+
+; ---------------------------------------------------------------------
+(define-public (parse-get-words parse-node)
+"
+  parse-get-words - Return a list of all word-instances in the parse.
+
+  Given a parse, return all word instances in arbitary order
+  This version is faster than the ordered version.
+"
 	(cog-chase-link 'WordInstanceLink 'WordInstanceNode parse-node)
 )
 
 ; ---------------------------------------------------------------------
-; parse-get-words-in-order - Given a parse, return a list of all words in the parse in order
-;
-; Given a parse, return all word instances in order
-;
-(define (parse-get-words-in-order parse-node)
-	(define word-inst-list (cog-chase-link 'WordInstanceLink 'WordInstanceNode parse-node))
-	(define number-list (map word-inst-get-number word-inst-list))
+(define-public (parse-get-words-in-order PARSE)
+"
+  parse-get-words-in-order - Given PARSE, return a list of all word
+  instances in the parse, in sequential order.
+"
+	; Get the scheme-number of the word-sequence numbe
+	(define (get-number word-inst)
+		(string->number (cog-name (word-inst-get-number word-inst))))
+
 	(define (less-than word-inst-1 word-inst-2)
-		(define index-1 (list-index (lambda (a-node) (equal? word-inst-1 a-node)) word-inst-list))
-		(define index-2 (list-index (lambda (a-node) (equal? word-inst-2 a-node)) word-inst-list))
-		(< (string->number (cog-name (list-ref number-list index-1))) (string->number (cog-name (list-ref number-list index-2)))))
-	(sort word-inst-list less-than)
+		(< (get-number word-inst-1) (get-number word-inst-2)))
+
+	(sort (parse-get-words PARSE) less-than)
 )
 
 ; --------------------------------------------------------------------
-; parse-get-relations    Get all RelEx relations in a parse.
-;
-; Given a parse, return a list of all relex relations
-;
-(define (parse-get-relations parse-node)
-	; Get a list of words in the parse
-	; Get a list of lists of relations for each word
-	; Conctenate will reduce the list of lists to a plain list
-	; Remove duplicates
-	(delete-duplicates!
-		(concatenate!
-			(map word-inst-get-relations 
-				(parse-get-words parse-node)
-			)
-		)
-	)
+(define-public (parse-get-interp parse-node)
+"
+  parse-get-interp    Get the interpretations of the parse.
+
+  Returns the InterpretationNodes associated with a ParseNode.
+"
+    (cog-chase-link 'InterpretationLink 'InterpretationNode parse-node)
 )
 
 ; --------------------------------------------------------------------
-; parse-get-r2l-outputs    Get all R2L outputs in a parse.
-;
-; Given a parse, returns a list of the r2l logic outputs associated
-; with the ParseNode.
-;
-(define (parse-get-r2l-outputs parse-node)
-	(let ((inters (cog-chase-link 'InterpretationLink 'InterpretationNode parse-node)))
-		(if (null? inters)
-			'()
-			(interp-get-r2l-outputs (car inters))
-		)
-	)
-)
+(define-public (interp-get-parse interp)
+"
+  interp-get-parse    Get the parse that resulted in the given interpretation.
 
-; --------------------------------------------------------------------
-; interp-get-r2l-outputs    Get all R2L outputs in an Interpretation.
-;
-; Given an interpretation, returns a list of the r2l logic outputs
-; associated with the InterpretationNode.
-;
-(define (interp-get-r2l-outputs interp-node)
-	(cog-outgoing-set (list-ref (cog-chase-link 'ReferenceLink 'SetLink interp-node) 0))
-)
-
-; --------------------------------------------------------------------
-; interp-get-parse    Get the Interpretation of a Parse.
-;
-; Returns the ParseNode associated with an InterpretationNode.
-;
-(define (interp-get-parse interp)
+  Returns the ParseNode associated with an InterpretationNode.
+"
 	(car (cog-chase-link 'InterpretationLink 'ParseNode interp))
 )
 
 ; ---------------------------------------------------------------------
-; word-inst-get-parse   Return the ParseNode associated with word-inst
-;
-; Return the ParseNode associated with 'word-inst'
-;
-(define (word-inst-get-parse word-inst)
+(define-public (word-inst-get-parse word-inst)
+"
+  word-inst-get-parse   Return the ParseNode associated with word-inst
+
+  Return the ParseNode associated with 'word-inst'
+"
 	(car (cog-chase-link 'WordInstanceLink 'ParseNode word-inst))
 )
 
 ; ---------------------------------------------------------------------
-; word-inst-get-number   Return the NumberNode associated with word-inst
-;
-; Return the NumberNode associated with 'word-inst'
-;
-(define (word-inst-get-number word-inst)
+(define-public (word-inst-get-number word-inst)
+"
+  word-inst-get-number   Return the NumberNode associated with word-inst
+
+  Return the NumberNode associated with 'word-inst'. This number is
+  the ordinal of the word in the sentence.  There can only ever be one
+  such ordinal per WordInstance, so this returns a single atom.
+"
 	(car (cog-chase-link 'WordSequenceLink 'NumberNode word-inst))
 )
 
 ; ---------------------------------------------------------------------
-; word-inst-get-word   Return the WordNode associated with word-inst
-;
-; Return the WordNode associated with 'word-inst'
-;
-(define (word-inst-get-word word-inst)
-	(cog-chase-link 'ReferenceLink 'WordNode word-inst)
+(define-public (word-inst-get-word word-inst)
+"
+  word-inst-get-word  -- Return the WordNode associated with word-inst
+
+  Return the WordNode associated with 'word-inst'. For example, given
+  `(WordInstance 'olah@12345')`, return `(WordNode 'olah')`
+
+  There can only ever be one WordNode per WordInstance, so this returns
+  a single atom.  However ...
+
+  However, due to a RelEx bug, this function might throw an exception.
+  Specifically, if the word in a sentence is a parenthesis, then the
+  ReferenceLink between the specific paren, and the general paren does
+  not get created.  Viz, there is no `(ReferenceLink (WordInstanceNode
+  '(@4bf5e341-c6b') (WordNode '('))`. Some paren-counter somewhere is
+  broken and gets confused. Beats me where. It should be fixed. In the
+  meanhile, a 'wrong-type-arg exception is thrown, when the `car` below
+  dereferences the empty list. Callers of this function may want to
+  catch this exception.
+"
+	(car (cog-chase-link 'ReferenceLink 'WordNode word-inst))
 )
 
 ; ---------------------------------------------------------------------
-; word-inst-get-word-str  Return the word string assoc with word-inst 
-;
-; Return the word string associated with the word-instance
-(define (word-inst-get-word-str word-inst)
-	(cog-name (car (word-inst-get-word word-inst)))
+(define-public (word-inst-get-links word-inst)
+"
+  word-inst-get-links       Get LG links involving word-inst
+
+  Given a word instance, return a list of all LG links that the
+  word-instance participates in.  For example, given
+  `(WordInstanceNode 'dog@12345')`, return all EvaluationLinks
+  of the form
+
+     Evaluati`onLink
+        LinkGrammarRelationshipNode 'foo'
+        ListLink
+           WordInstanceNode 'dog@12345'
+           WordInstanceNode 'toy@6789'
+
+  with the WordInstance in either the first or the second place.
+"
+	(cog-get-pred word-inst 'LinkGrammarRelationshipNode)
 )
 
 ; ---------------------------------------------------------------------
-; word-inst-get-lemma  Return the lemma of word instance.
-;
-; Given a word instance, return the lemma for of the word.
-; Also works if the word-inst is actually a seme.
-(define (word-inst-get-lemma word-inst)
-	(let ((wlist (cog-chase-link 'LemmaLink 'WordNode word-inst)))
-		(if (null? wlist)
-			'()
-			(car wlist)
-		)
-	)
-)
+(define-public (word-inst-get-senses word-inst)
+"
+  word-inst-get-senses   Get word senses associated with word.
 
-; ---------------------------------------------------------------------
-; word-inst-get-attr   Return attributes of word instance
-;
-; Given a word instance, return a list of attributes for the word.
-;
-(define (word-inst-get-attr word-inst)
-	(cog-chase-link 'InheritanceLink 'DefinedLinguisticConceptNode 
-		word-inst
-	)
-)
-
-; ---------------------------------------------------------------------
-; word-inst-get-pos    Return part-of-speech (POS) of word instance
-;
-; Return the part-of-speech of a word-instance
-; 
-(define (word-inst-get-pos word-inst)
-	(cog-chase-link 'PartOfSpeechLink 'DefinedLinguisticConceptNode 
-		word-inst
-	)
-)
-
-; ---------------------------------------------------------------------
-; word-inst-match-pos? Does word-inst have POS?
-;
-; Return #t is the word-instance has part-of-speech pos else #f
-; "word-inst" must have a PartOfSpeechLink on it; typically its 
-; a WordInstanceNode.
-; "pos" is a string, typically "noun" or "verb".
-;
-; Not all word instances are always tagged. For example, in a sentence
-; with "John Kennedy", John won't have a pos tag, because RelEx will
-; have already meged this into an entity string (and tagged the string).
-;
-(define (word-inst-match-pos? word-inst pos)
-	(let ((pos-list (word-inst-get-pos word-inst)))
-		(if (null? pos-list)
-			#f
-			(string=? pos (cog-name (car pos-list)))
-		)
-	)
-)
-
-; ---------------------------------------------------------------------
-; word-inst-is-noun?   Is word instance a noun?
-;
-; Return #t is the word-instance is a noun
-; 
-(define (word-inst-is-noun? word-inst)
-	(word-inst-match-pos? word-inst "noun")
-)
-
-; ---------------------------------------------------------------------
-; word-inst-is-verb?   Is word instance a verb?
-;
-; Return #t is the word-instance is a verb
-; 
-(define (word-inst-is-verb? word-inst)
-	(word-inst-match-pos? word-inst "verb")
-)
-
-; ---------------------------------------------------------------------
-; word-inst-get-relations       Get RelEx relations involving word-inst
-;
-; Given a word instance, return a list of relations the word participates in.
-; That is, given (WordInstanceNode "dog"), return all _subj(*,dog)
-; _subj(dog,*), _obj(dog,*) etc.
-;
-; See also word-inst-get-head-relations and 
-; word-inst-get-relex-modifiers below.
-;
-(define (word-inst-get-relations word-inst)
-	(cog-get-pred word-inst 'DefinedLinguisticRelationshipNode)
-)
-
-; ---------------------------------------------------------------------
-; word-inst-get-prep-relations  Get prepositional relations for word-inst
-;
-(define (word-inst-get-prep-relations word-inst)
-	(cog-get-pred word-inst 'PrepositionalRelationshipNode)
-)
-
-; --------------------------------------------------------------------
-; word-inst-get-head-relations  Get relations with word-inst as head
-;
-; Given a word-instance, return a list of relex relations that 
-; this word-instance is the head-word of. (It is the head-word
-; if it is first e.g. _amod(head-word, attr-word)
-;
-(define (word-inst-get-head-relations word-inst)
-
-	; Return #t if the word-inst is the head-word.
-	(define (head? rel wrd-inst)
-		(let* ((oset (cog-outgoing-set rel))
-				(head (car (cog-outgoing-set (cadr oset))))
-			)
-			(equal? head wrd-inst)
-		)
-	)
-
-	; Get all relations, and filter them out.
-	(filter! 
-		(lambda (rel) (head? rel word-inst))
-		(word-inst-get-relations word-inst)
-	)
-)
-
-; --------------------------------------------------------------------
-; word-inst-filter-relex-rels   Get filtered set of RelEx relations
-;
-; Given a word-instance and a list of relex relation names, return a
-; list of the relex relations for which this word-instance is the 
-; head-word.  The head-word is the first word in the relation -- 
-; for example _amod(head-word, dependent-word)
-
-(define (word-inst-filter-relex-rels word-inst rel-name-list)
-
-	(define (is-modifier? str)
-		(any (lambda (rel) (string=? rel str)) rel-name-list)
-	)
-
-	; Return #t if the relex relation is in the rel-name-list
-	; and the word-inst is the head-word.
-	(define (head-mod? rel wrd-inst)
-		(let* ((oset (cog-outgoing-set rel))
-				(head (car (cog-outgoing-set (cadr oset))))
-			)
-			(and 
-				(equal? head wrd-inst)
-				(is-modifier? (cog-name (car oset)))
-			)
-		)
-	)
-
-	; Get all relations, and filter them out.
-	(filter! 
-		(lambda (rel) (head-mod? rel word-inst))
-		(word-inst-get-relations word-inst)
-	)
-)
-
-; --------------------------------------------------------------------
-; verb-inst-get-relex-rels      Get relations for a verb.
-;
-; Given a verb word-instance, return a list of relex relations that 
-; this word-instance is the head-word of. (It is the head-word
-; if it is first e.g. _subj(head-word, dependency-word)
-;
-(define (verb-inst-get-relex-rels word-inst)
-	; There are a few other relations we should probably deal with,
-	; e.g. _predadj Right now, this is unclear.
-	; Modifiers are documented at:
-	; http://opencog.org/wiki/Binary_relations
-	(word-inst-filter-relex-rels word-inst 
-		(list "_advmod" "_iobj" "_obj" "_subj")
-	)
-)
-
-; --------------------------------------------------------------------
-; noun-inst-get-relex-modifiers Get relations for a noun.
-;
-; Given a noun word-instance, return a list of relex modifiers that 
-; this word-instance is the head-word of. (It is the head-word
-; if it is first e.g. _amod(head-word, attr-word)
-;
-; This very explicitly returns *only* modifiers, and not relations in
-; general. 
-;
-(define (noun-inst-get-relex-modifiers word-inst)
-	; There are a few other modifiers we should probably deal with,
-	; including quantity multiplier, etc. Right now, this is unclear.
-	; Modifiers are documented at:
-	; http://opencog.org/wiki/Binary_relations
-	(word-inst-filter-relex-rels word-inst 
-		(list "_amod" "_appo" "_nn" "_poss" "_%quantity")
-	)
-)
-
-; --------------------------------------------------------------------
-; noun-inst-get-prep-rels       Get prep relations for noun.
-;
-; Given a noun word-instance, return a list of prepositional relations
-; that this word-instance is the head-word of. (It is the head-word
-; if it is first e.g. prep(head-word, dependent-word)
-;
-(define (noun-inst-get-prep-rels word-inst)
-
-	; Return #t if the relex relation is prepositional,
-	; and the word-inst is the head-word.
-	(define (head-prel? rel wrd-inst)
-		(let* ((oset (cog-outgoing-set rel))
-				(head (car (cog-outgoing-set (cadr oset))))
-			)
-			(and 
-				(equal? head wrd-inst)
-				(eq? 'PrepositionalRelationshipNode (cog-type (car oset)))
-			)
-		)
-	)
-
-	; Get all relations, and filter them out.
-	(filter! 
-		(lambda (rel) (head-prel? rel word-inst))
-		(word-inst-get-prep-relations word-inst)
-	)
-)
-
-; ---------------------------------------------------------------------
-; word-inst-get-subscript-str   Get link-grammar subscript for word-inst
-; 
-; Given a word instance, return the subscript string for it.
-; The "subscript string" is the part that follows the period in
-; the link-grammar dictionary. Thus, for the dictionary entry
-; "red.a" the ".a" is the subscript.  Note that not all link-grammar
-; dictionary entries will have a subscript.
-;
-(define (word-inst-get-subscript-str word-inst)
-	; all subscripts start with a period as the first character.
-	(define (subscript? tag)
-		(if (char=? #\. (string-ref (cog-name tag) 0))
-			#t #f
-		)
-	)
-	(let ((infl (filter! subscript? (word-inst-get-attr word-inst))))
-		(if (null? infl)
-			""
-			(cog-name (car infl))
-		)
-	)
-)
-
-; ---------------------------------------------------------------------
-; word-inst-get-subscripted-word-str Get LG subscripted word string.
-;
-; Given a word instance, return the subscripted word.
-; Here, "subscripted words" are link-grammar dictionary entries, for 
-; example, "events.n" or "offered.v". Note that not all link-grammar
-; dictionary entries will have a subscript.
-;
-(define (word-inst-get-subscripted-word-str word-inst)
-	(string-append
-		(word-inst-get-word-str word-inst)
-		(word-inst-get-subscript-str word-inst)
-	)
-)
-
-; ---------------------------------------------------------------------
-; word-inst-get-senses   Get word senses associated with word.
-;
-; Given a word instance, return a list of the word-senses associated
-; with the word.
-(define (word-inst-get-senses word-inst)
+  Given a word instance, return a list of the word-senses associated
+  with the word.
+"
 	(cog-chase-link 'InheritanceLink 'WordSenseNode word-inst)
 )
 
 ; ---------------------------------------------------------------------
-; word-inst-sense-score  Get ranking score for word-inst & word-sense.
-;
-; Given a word-instance and a word-sense, return the numerical 
-; word-sense ranking score. The rank is stored as the "count" part of the
-; count truth value of the InheritanceLink connecting the two: i.e. in
-; the structure
-;
-;     InheritanceLink (ctv 1.0 0.0 -0.006025)
-;        WordInstanceNode "day@171506d8f3"
-;        WordSenseNode "daylight%1:28:00::"
-;
-; If there is no such link, return -999 as the score.
-;
-(define (word-inst-sense-score word-inst word-sense)
+(define-public (word-inst-sense-score word-inst word-sense)
+"
+  word-inst-sense-score  Get ranking score for word-inst & word-sense.
+
+  Given a word-instance and a word-sense, return the numerical
+  word-sense ranking score. The rank is stored as the 'count' part of the
+  count truth value of the InheritanceLink connecting the two: i.e. in
+  the structure
+
+      InheritanceLink (ctv 1.0 0.0 -0.006025)
+         WordInstanceNode 'day@171506d8f3'
+         WordSenseNode 'daylight%1:28:00::'
+
+  If there is no such link, return -999 as the score.
+"
 	(let ((slink (cog-link 'InheritanceLink word-inst word-sense)))
 		(if (null? slink)
 			-999.0
 			(cdr (assoc 'count (cog-tv->alist (cog-tv slink))))
 		)
 	)
-) 
+)
 
 ; ---------------------------------------------------------------------
-; word-inst-get-disjunct -- Get the disjunct (LgAnd) used for a word-inst.
-;
-(define (word-inst-get-disjunct word-inst)
+(define-public (word-inst-get-cset word-inst)
+"
+  word-inst-get-cset -- Get the connector set (LgWordCset) attached
+  to the word-inst.  For example, this returns
+
+  (LgWordCset
+      (WordInstanceNode 'foobar@62e9c582-1984')
+      (LgAnd ..))
+"
+	(car (filter!
+		(lambda (x) (eq? (cog-type x) 'LgWordCset))
+		(cog-incoming-set word-inst)))
+)
+
+; ---------------------------------------------------------------------
+(define-public (word-inst-get-disjunct word-inst)
+"
+  word-inst-get-disjunct -- Get the disjunct (LgAnd) used for a word-inst.
+"
 	(car (cog-chase-link 'LgWordCset 'LgAnd word-inst))
 )
 
-; ---------------------------------------------------------------------
-; word-inst-get-source-conn -- Get the set of connectors word-inst linked to.
-;
-; The returned set will be a list instead of as a disjunct, because
-; such a set is not really a disjunct (the order of - & + are reversed)
-; but instead is a 1-to-1 matching of the connectors in the disjunct
-; word-inst used.
-;
-(define (word-inst-get-source-conn word-inst)
-	(define (great-helper l1 l2)
-		(define w1-seq (word-inst-get-number (gadr l1)))
-		(define w2-seq (word-inst-get-number (gadr l2)))
-		(> (string->number (cog-name w1-seq)) (string->number (cog-name w2-seq)))
-	)
-	(define (less-helper l1 l2)
-		(define w1-seq (word-inst-get-number (gddr l1)))
-		(define w2-seq (word-inst-get-number (gddr l2)))
-		(< (string->number (cog-name w1-seq)) (string->number (cog-name w2-seq)))
-	)
-	; get the left & right LgLinkInstanceNode predicates
-	(receive (lg-insts-left lg-insts-right)
-	         (partition (lambda (l) (equal? (gddr l) word-inst))
-	                    (cog-get-pred word-inst 'LgLinkInstanceNode))
-		; sort links on the left in reverse word sequence order, so
-		; closer words will be ordered first
-		; sort links on the right in word sequence order, so closer
-		; words will be ordered first
-		(let ((lg-insts-left-sort (sort lg-insts-left great-helper))
-		      (lg-insts-right-sort (sort lg-insts-right less-helper))
-		      (get-inst-link (lambda (l) (car (cog-filter 'LgLinkInstanceLink (cog-incoming-set (gar l)))))))
-			(append
-				(map (lambda (l) (cadr (cog-outgoing-set (get-inst-link l)))) lg-insts-left-sort)
-				(map (lambda (l) (caddr (cog-outgoing-set (get-inst-link l)))) lg-insts-right-sort)				
-			)
-		)
-	)
-)
-
 ; --------------------------------------------------------------------
-; relation-get-dependent Get dependent part of a relation.
-;
-; Given a relation, return the dependent item in the relation. 
-; That is, given the relation  _rel(head-word, dependent-word)
-; return the dependent-word.  This does no error checking.
-;
-(define (relation-get-dependent rel)
-	; cadr because the dependent word is second in the relation.
-	(cadr 
-		(cog-outgoing-set
-			; cadr because ListLink is second in the EvaluationLink
-			(cadr
-				(cog-outgoing-set rel)
-			)
-		)
-	)
-)
+(define-public (delete-sentence sent)
+"
+  delete-sentence SENT -- delete all atoms associated with a sentence.
 
-; --------------------------------------------------------------------
-; delete-sentence -- delete all atoms associated with a sentence.
-;
-; Delete the parses and word-instances associated with the sentence,
-; including LemmaLink's, ReferenceLinks, RelEx relations, and 
-; link-grammar linkages.
-;
-; Only the atoms in the atomspace are removed; if any are in the
-; backingstore (database) they are untouched.
+  Delete the parses and word-instances associated with the sentence,
+  including LemmaLink's, ReferenceLinks, RelEx relations, and
+  link-grammar linkages.
 
-(define (delete-sentence sent)
-	(define (delete-word-instance wi)
-		(cog-purge-recursive wi)
+  Only the atoms in the atomspace are removed; if any are in the
+  backingstore (database), they are untouched.
+
+  Expect SENT to be a SentenceNode; thus the general structure is
+  expected to be:
+
+    ParseLink
+         ParseNode
+         SentenceNode
+"
+	; Purge stuff associated with a single LgLinkInstanceNode
+	(define (extract-link-instance li)
+		(if (cog-atom? li) (cog-extract-recursive li))
 	)
 
-	; Delete, recusively, all of the word-instances in the parse.
-	(define (delete-parse parse)
-		(for-each 
-			(lambda (x) 
+	; Purge stuff associated with a single word-instance.
+	; Expects wi to be a WordInstanceNode.
+	; Calling extract-recursive will blow away most of the junk
+	; that the WordInstance appear in, but this will leave behind
+	; dangling LgLinkInstances and occasional unused NumberNodes.
+	; These have to be removed manually.
+	;
+	; The LgLinkInstances appear like so:
+	;
+	;     EvaluationLink
+	;           LgLinkInstanceNode
+	;           ListLink
+	;               WordInstanceNode
+	;               WordInstanceNode
+	;
+	; while the NumberNodes as
+	;
+	;     WordSequenceLink
+	;         WordInstanceNode
+	;         NumberNode
+	;
+	; The extract-recursive will blow away everything else --
+	; the LemmaLinks, ReferenceLinks, etc.
+
+	(define (extract-word-instance wi)
+		(for-each
+			(lambda (x)
+				(cond
+					((eq? 'ListLink (cog-type x))
+						(for-each extract-link-instance
+							(cog-chase-link 'EvaluationLink 'LgLinkInstanceNode x)))
+
+					; Extract the NumberNode, but only if it's not used.
+					((eq? 'WordSequenceLink (cog-type x))
+						(let ((oset (cog-outgoing-set x)))
+							(cog-extract x)
+							(cog-extract (cadr oset))))))
+			(cog-incoming-set wi))
+		(cog-extract-recursive wi)
+	)
+
+	; Purge, recusively, all of the word-instances in the parse.
+	; This is expecting 'parse' to be a ParseNode.
+	; The following is expected:
+	;
+	;      WordInstanceLink
+	;           WordInstanceNode
+	;           ParseNode
+	;
+	(define (extract-parse parse)
+		(for-each
+			(lambda (x)
 				(if (eq? 'WordInstanceLink (cog-type x))
-					(delete-word-instance (car (cog-outgoing-set x)))
-				)
-			)
+					(extract-word-instance (car (cog-outgoing-set x)))))
 			(cog-incoming-set parse)
 		)
-		(cog-purge-recursive parse)
+		(cog-extract-recursive parse)
 	)
 
-	; For each parse of the sentence, delete parse
-	(for-each 
-		(lambda (x) 
-			(if (eq? 'ParseLink (cog-type x))
-				(delete-parse (car (cog-outgoing-set x)))
+	; For each parse of the sentence, extract the parse
+	; This is expecting a structure
+	;
+	;     ParseLink
+	;         ParseNode     car of the outgoing set
+	;         SentenceNode
+	(for-each
+		(lambda (x)
+			(cond
+				((eq? 'ParseLink (cog-type x))
+					; The car will be a ParseNode
+					(extract-parse (car (cog-outgoing-set x))))
+
+				; Extract the NumberNode, but only if it's not used.
+				((eq? 'SentenceSequenceLink (cog-type x))
+					(let ((oset (cog-outgoing-set x)))
+						(cog-extract x)
+						(cog-extract (cadr oset))))
 			)
 		)
 		(cog-incoming-set sent)
 	)
 
-	; This delete will fail if there are still incoming links ... 
+	; This delete will fail if there are still incoming links ...
 	; this is intentional. Its up to the caller to cleanup.
-	(cog-purge sent)
+	(cog-extract sent)
 )
 
 ; ---------------------------------------------------------------------
-; delete-sentences       Delete all atoms that occur in sentences
-;
-; Delete atoms that belong to particular sentence instances; we don't
-; want to clog up the atomspace with old junk we don't want any more.
-;
-; Only the atoms in the atomspace are removed; if any are in the
-; backingstore (database) they are untouched.
-;
-; XXX TODO: In principle, this could be accomplished by lowering the
-; AttentionValue for the atoms, and letting the ForgettingAgent do its
-; work. In practice, this is too complicated, for now.
-;
-; XXX: Some of these nodes & links are needed by the language generation
-; pipeline for matching to old sentences, so maybe they cannot be
-; removed.
-;
-(define (delete-sentences)
+(define-public (delete-sentences)
+"
+  delete-sentences       Delete all atoms that occur in sentences
+
+  Delete atoms that belong to particular sentence instances; we don't
+  want to clog up the atomspace with old junk we don't want any more.
+
+  Only the atoms in the atomspace are removed; if any are in the
+  backingstore (database), they are untouched.
+
+  XXX TODO: In principle, this could be accomplished by lowering the
+  AttentionValue for the atoms, and letting the ForgettingAgent do its
+  work. In practice, this is too complicated, for now.
+
+  XXX: Some of these nodes & links are needed by the language generation
+  pipeline for matching to old sentences, so maybe they cannot be
+  removed.
+"
 	(let ((n 0))
 	; (define (delit atom) (set! n (+ n 1)) #f)
-	; (define (delit atom) (cog-purge-recursive atom) #f)
-	(define (delit atom) (cog-purge-recursive atom) (set! n (+ n 1)) #f)
+	; (define (delit atom) (cog-extract-recursive atom) #f)
+	(define (delit atom) (cog-extract-recursive atom) (set! n (+ n 1)) #f)
 
-	; (define (delone atom) (cog-purge atom) #f)
-	(define (delone atom) (cog-purge atom) (set! n (+ n 1)) #f)
+	; (define (delone atom) (cog-extract atom) #f)
+	; (define (delone atom) (cog-extract atom) (set! n (+ n 1)) #f)
+	(define (delone atom) (extract-hypergraph atom) (set! n (+ n 1)) #f)
 
-	; Can't delete InheritanceLink, its used to mark wsd completed... 
+	; Can't delete InheritanceLink, its used to mark wsd completed...
 	; (cog-map-type delone 'InheritanceLink)
 	; Can't delete EvaluationLink, these are used elsewhere.
 	; (cog-map-type delone 'EvaluationLink)
 	; Can't delete ListLink, these are used in EvaluationLinks.
 	; (cog-map-type delone 'ListLink)
-	
-	; Part of Speech links are used in the word-sense 
+
+	; Part of Speech links are used in the word-sense
 	; database, so cannot delete these.
 	; (cog-map-type delone 'PartOfSpeechLink)
 	; Can't delete LemmaLink's; used by the triples processing rules
@@ -721,6 +493,7 @@
 
 	(cog-map-type delone 'ParseLink)
 	(cog-map-type delone 'ReferenceLink)
+	(cog-map-type delone 'LgLinkInstanceLink)
 
 	(cog-map-type delone 'CosenseLink)
 
@@ -736,12 +509,13 @@
 	(cog-map-type delit 'SentenceNode)
 	(cog-map-type delit 'ParseNode)
 	(cog-map-type delit 'WordInstanceNode)
+	(cog-map-type delit 'LgLinkInstanceNode)
 
-	; Pointless to delete these, since there should only be 
+	; Pointless to delete these, since there should only be
 	; a few hundred of these, total.
-	; (cog-map-type delit 'LinkGrammarRelationshipNode) 
-	; (cog-map-type delit 'DefinedLinguisticConceptNode) 
-	; (cog-map-type delit 'DefinedLinguisticRelationshipNode) 
+	; (cog-map-type delit 'LinkGrammarRelationshipNode)
+	; (cog-map-type delit 'DefinedLinguisticConceptNode)
+	; (cog-map-type delit 'DefinedLinguisticRelationshipNode)
 
 (system (string-join (list "echo deleted: " (number->string n) )))
 	)

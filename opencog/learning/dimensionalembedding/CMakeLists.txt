@@ -3,13 +3,6 @@ ADD_LIBRARY (dimensionalembedding SHARED
 	CoverTreePoint
 )
 
-ADD_DEPENDENCIES(dimensionalembedding opencog_atom_types)
-
-INCLUDE_DIRECTORIES (
-	${CMAKE_BINARY_DIR}
-	${ODBC_INCLUDE_DIRS}
-)
-
 IF (CYGWIN)
 	INSTALL (TARGETS dimensionalembedding
 		DESTINATION "lib${LIB_DIR_SUFFIX}/opencog"
@@ -21,7 +14,7 @@ ELSE (CYGWIN)
 ENDIF (CYGWIN)
 
 TARGET_LINK_LIBRARIES (dimensionalembedding
-	atomspaceutils
-	atomspace
+	server
+	${ATOMSPACE_LIBRARIES}
 	${COGUTIL_LIBRARY}
 )

@@ -2,8 +2,8 @@ ENABLE_TESTING()
 INCLUDE(AddCxxtest)
 
 IF (WIN32)
-	ADD_DEFINITIONS(-D_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES
-	                -D_CRT_SECURE_NO_WARNINGS)
+    ADD_DEFINITIONS(-D_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES
+                    -D_CRT_SECURE_NO_WARNINGS)
 ENDIF (WIN32)
 
 ADD_DEFINITIONS(-DPROJECT_SOURCE_DIR=\\"${CMAKE_SOURCE_DIR}\\"
@@ -17,53 +17,36 @@ INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR})
 # its is tested first.
 IF (CXXTEST_FOUND)
 
-	IF (HAVE_ATOMSPACE)
-		ADD_SUBDIRECTORY (atomspace)
-		ADD_SUBDIRECTORY (atomutils)
+    IF (HAVE_ATOMSPACE)
+        ADD_SUBDIRECTORY (attention)
 
-		# Persistence is for saving/restoring atomspace to disk.
-		ADD_SUBDIRECTORY (persist)
+        # Persistence is for saving/restoring atomspace to disk.
+        ADD_SUBDIRECTORY (persist)
 
-		# guile provides scheme bindings for the atomspace.
-		IF (HAVE_GUILE)
-			ADD_SUBDIRECTORY (scm)
-		ENDIF (HAVE_GUILE)
+        # The cogserver exposes the atomspace to outside users.
+        IF (HAVE_SERVER)
+            ADD_SUBDIRECTORY (server)
+        ENDIF (HAVE_SERVER)
 
-		# Many of the query tests require a working guile, so run
-		# these only after guile has been tested.
-		ADD_SUBDIRECTORY (query)
+        IF (HAVE_OCTOMAP)
+            ADD_SUBDIRECTORY (spacetime)
+        ENDIF (HAVE_OCTOMAP)
 
-		# Currently, reasoning depends on query, above.
-		ADD_SUBDIRECTORY (reasoning)
+        ADD_SUBDIRECTORY (nlp)
 
-		# The cogserver exposes the atomspace to outside users.
-		IF (HAVE_SERVER)
-			ADD_SUBDIRECTORY (server)
-		ENDIF (HAVE_SERVER)
+        ADD_SUBDIRECTORY (pln)
 
- 		ADD_SUBDIRECTORY (spatial)
+        ADD_SUBDIRECTORY (pln_old)
 
-		ADD_SUBDIRECTORY (nlp)
+        ADD_SUBDIRECTORY (openpsi)
 
-		ADD_SUBDIRECTORY (pln)
+    ENDIF (HAVE_ATOMSPACE)
 
-	ENDIF (HAVE_ATOMSPACE)
+    IF (HAVE_CYTHON AND PYTHONINTERP_FOUND)
+        ADD_SUBDIRECTORY (cython)
+        ADD_SUBDIRECTORY (python)
+    ENDIF (HAVE_CYTHON AND PYTHONINTERP_FOUND)
 
-	IF (HAVE_CYTHON AND PYTHONINTERP_FOUND)
-		ADD_SUBDIRECTORY (cython)
-		ADD_SUBDIRECTORY (python)
-	ENDIF (HAVE_CYTHON AND PYTHONINTERP_FOUND)
-
-	IF (HAVE_ATTENTION)
-		ADD_SUBDIRECTORY (dynamics)
-	ENDIF (HAVE_ATTENTION)
-
-	ADD_SUBDIRECTORY (learning)
-
-	# Embodiment requires that learning, spatial, etc.
-	# all works fine. So run this last.
-	IF (HAVE_EMBODIMENT)
-		ADD_SUBDIRECTORY (embodiment)
-	ENDIF (HAVE_EMBODIMENT)
+    ADD_SUBDIRECTORY (learning)
 
 ENDIF (CXXTEST_FOUND)

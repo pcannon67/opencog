@@ -27,8 +27,8 @@
 #include <string>
 
 #include <opencog/atomspace/AtomSpace.h>
-#include <opencog/atomspace/AttentionValue.h>
-#include <opencog/server/Agent.h>
+#include <opencog/truthvalue/AttentionValue.h>
+#include <opencog/cogserver/server/Agent.h>
 #include <opencog/util/Logger.h>
 
 #include "Pattern.h"
@@ -78,7 +78,7 @@ public:
      */
     Logger* getLogger();
 
-    //! Set pattern to imprint when Agent runs 
+    //! Set pattern to imprint when Agent runs
     void setPattern(Pattern _epsilon);
 
 }; // class

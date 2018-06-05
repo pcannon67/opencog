@@ -5,7 +5,7 @@ OPENCOG_ADD_ATOM_TYPES(
 	atom_types.definitions
 	atom_types.inheritance
 	nlp_types.scm
-    nlp_types.pyx
+	nlp_types.pyx
 )
 ADD_CUSTOM_TARGET(nlp_atom_types DEPENDS atom_types.h)
 
@@ -17,18 +17,26 @@ ADD_LIBRARY (nlp-types SHARED
 	NLPTypes
 )
 
+TARGET_LINK_LIBRARIES(nlp-types
+	${ATOMSPACE_LIBRARIES}
+)
+
 # Without this, parallel make will race and crap up the generated files.
 ADD_DEPENDENCIES(nlp-types nlp_atom_types)
 
 IF (WIN32)
-    INSTALL (TARGETS nlp-types DESTINATION "lib${LIB_DIR_SUFFIX}/opencog")
-ELSEIF (CYGWIN)
-    INSTALL (TARGETS nlp-types DESTINATION "lib${LIB_DIR_SUFFIX}/opencog")
+    INSTALL (TARGETS nlp-types
+		DESTINATION "lib${LIB_DIR_SUFFIX}/opencog")
 ELSE (WIN32)
-    INSTALL (TARGETS nlp-types LIBRARY DESTINATION "lib${LIB_DIR_SUFFIX}/opencog")
+    INSTALL (TARGETS nlp-types
+		LIBRARY DESTINATION "lib${LIB_DIR_SUFFIX}/opencog")
 ENDIF (WIN32)
 
 INSTALL (FILES
 	${CMAKE_CURRENT_BINARY_DIR}/atom_types.h
 	DESTINATION "include/${PROJECT_NAME}/nlp/types"
+)
+INSTALL (FILES
+	${CMAKE_CURRENT_BINARY_DIR}/nlp_types.scm
+	DESTINATION "${DATADIR}/scm/opencog/nlp/types"
 )

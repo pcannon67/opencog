@@ -2,7 +2,16 @@
 (use-modules (oop goops))
 (use-modules (ice-9 receive))
 
-(load "helpers.scm")
+; Attention: cannot use load, must use include, because the helpers.scm
+; file has a set-values! macro which borks with a load.  Well, it
+; actually works fine, if `helpers.scm` is installed, but the unit tests
+; are run before the install step, and these fail when the set-values!
+; macro is used, below.
+; (load "helpers.scm")
+; (include "helpers.scm")
+; Aiee!  include fails, when installed, due to the relative paths!
+(add-to-load-path "/usr/local/share/opencog/scm")
+(include-from-path "opencog/nlp/microplanning/helpers.scm")
 
 ; -----------------------------------------------------------------------
 ; <noun-item> -- A class containing information on a noun
@@ -32,7 +41,7 @@
 		(define is-singular (word-inst-has-attr? word-inst "singular"))
 		(define is-human (word-inst-has-attr? word-inst "person"))
 		(define is-male (and is-human (word-inst-has-attr? word-inst "masculine")))
-		
+
 		(define (rebase-pronoun orig)
 			(cond ((regexp-exec (make-regexp "(I|me|my|myself)" regexp/icase) orig) "I")
 			      ((regexp-exec (make-regexp "(you|your|yourself)" regexp/icase) orig) "you")
@@ -43,12 +52,12 @@
 			      ((regexp-exec (make-regexp "(they|them|their|themselves)" regexp/icase) orig) "they")
 			)
 		)
-		
+
 		; TODO recognition of "our group" -> "we" and "our cars" -> "they"
-				
+
 		(cond ; if already a pronoun, change it to the base form
 		      (is-pronoun
-			(rebase-pronoun (word-inst-get-word-str word-inst))
+			(rebase-pronoun (cog-name (word-inst-get-word word-inst)))
 		      )
 		      ((and is-human is-male)
 			"he"
@@ -69,7 +78,7 @@
 	(if (= 0 (string-length (slot-ref ni 'base-pronoun)))
 		(slot-set! ni 'base-pronoun (determine-pronoun))
 	)
-	
+
 	(slot-ref ni 'base-pronoun)
 )
 
@@ -87,17 +96,17 @@
 	(define the-orig-link (get-orig-link ni))
 	(define the-base-pronoun (get-base-pronominal ni))
 	(define the-atom-index (get-atom-index ni))
-	
+
 	(define matched-subgraph)
 	(define matched-base-index)
 	(set-values! (matched-subgraph matched-base-index) (match-sentence-forms the-orig-link forms-list))
-	
+
 	; rebase the atom index to that of the matched-subgraph
 	; the atom index is needed because of atom like
 	;     (EvaluationLink (PredicateNode "punched") (ListLink (ConceptNode "I") (ConceptNode "I"))
 	; where the same (ConceptNode "I") could be matched to "I" or "myself"
 	(set! the-atom-index (- the-atom-index matched-base-index))
-		
+
 	; if matched a sentence form, the link has basic subject-verb-object structure
 	(if matched-subgraph
 		(cond ; if the node is at the subject position
@@ -181,7 +190,7 @@
 
 			; remove links in subsets that are not about a noun
 			(set! subsets (filter (lambda (l) (word-inst-is-noun? (r2l-get-word-inst (gar l)))) subsets))
-		
+
 			; remove close to false or low confidence links base on TruthValue
 			(set! subsets (filter (lambda (l) (and (> (tv-mean (cog-tv l)) 0.5) (> (tv-conf (cog-tv l)) 0.5))) subsets))
 
@@ -219,12 +228,11 @@
 			)
 		)
 	)
-	
+
 	; get & store the lexical choice if not determined before
 	(if (null? (slot-ref ni 'lexical-node))
 		(slot-set! ni 'lexical-node (determine-lexical))
 	)
-	
+
 	(slot-ref ni 'lexical-node)
 )
-

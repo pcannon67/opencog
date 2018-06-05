@@ -17,6 +17,10 @@ IF (COMMAND CMAKE_POLICY)
 	CMAKE_POLICY(SET CMP0005 OLD)
 ENDIF (COMMAND CMAKE_POLICY)
 
+IF(CMAKE_VERSION VERSION_GREATER 3.0.2)
+	CMAKE_POLICY(SET CMP0037 OLD)
+ENDIF(CMAKE_VERSION VERSION_GREATER 3.0.2)
+
 PROJECT(opencog)
 
 # To supress Cygwin warning "CMake no longer defines WIN32 on Cygwin!"
@@ -129,6 +133,28 @@ ENDIF (WIN32)
 # ===================================================================
 # Check for existance of various required, optional packages.
 
+# Check for cogutil first, then check for atomspace
+# Cogutil
+FIND_PACKAGE(CogUtil 2.0.1 REQUIRED)
+IF (COGUTIL_FOUND)
+	MESSAGE(STATUS "CogUtil found.")
+	ADD_DEFINITIONS(-DHAVE_COGUTIL)
+	SET(HAVE_COGUTIL 1)
+ELSE (COGUTIL_FOUND)
+	MESSAGE(FATAL_ERROR "CogUtil missing: it is needed for everything!")
+ENDIF (COGUTIL_FOUND)
+
+# AtomSpace
+FIND_PACKAGE(AtomSpace 5.0.3 REQUIRED)
+IF (ATOMSPACE_FOUND)
+	MESSAGE(STATUS "AtomSpace found.")
+	ADD_DEFINITIONS(-DHAVE_ATOMSPACE)
+	SET(HAVE_ATOMSPACE 1)
+ELSE (ATOMSPACE_FOUND)
+	MESSAGE(FATAL_ERROR "AtomSpace missing: it is needed for everything!")
+ENDIF (ATOMSPACE_FOUND)
+
+
 # Check for boost. We need dynamic-linked, threaded libs by default.
 SET(Boost_USE_STATIC_LIBS OFF)
 SET(Boost_USE_MULTITHREADED ON)
@@ -178,20 +204,16 @@ ELSE(Boost_MATH_C99_FOUND)
 	MESSAGE(STATUS "Boost math missing: needed to run combo learning tests.")
 ENDIF(Boost_MATH_C99_FOUND)
 
-# Cogutils
-FIND_PACKAGE(CogUtil)
-IF (COGUTIL_FOUND)
-	MESSAGE(STATUS "CogUtil found.")
-	ADD_DEFINITIONS(-DHAVE_COGUTIL)
-	SET(HAVE_COGUTIL 1)
-ELSE (COGUTIL_FOUND)
-	MESSAGE(FATAL_ERROR "CogUtil missing: it is needed for everything!")
-ENDIF (COGUTIL_FOUND)
-
-FIND_PACKAGE(CURL)
-IF (NOT CURL_FOUND)
-	MESSAGE(STATUS "libcurl missing: needed for ubigraph module.")
-ENDIF (NOT CURL_FOUND)
+# cpprest
+FIND_PACKAGE(cpprest 2.6)
+IF (cpprest_FOUND AND cpprest_LIBRARY)
+	ADD_DEFINITIONS(-DHAVE_cpprest)
+	SET(HAVE_cpprest 1)
+	SET(cpprest_DIR_MESSAGE "cpprest was found.")
+ELSE (cpprest_FOUND AND cpprest_LIBRARY)
+        SET(cpprest_DIR_MESSAGE "cpprest was not found; Distributed version of PatternMiner will not be built.\nTo over-ride, make sure that the environment variable cpprest_LIBRARY is set.\nInstallation instructions: https://casablanca.codeplex.com/")
+ENDIF (cpprest_FOUND AND cpprest_LIBRARY)
+MESSAGE(STATUS "${cpprest_DIR_MESSAGE}")
 
 FIND_PACKAGE(Cxxtest)
 IF (NOT CXXTEST_FOUND)
@@ -207,16 +229,6 @@ ELSE (GHC_FOUND)
 	SET(GHC_DIR_MESSAGE "GHC was not found; Haskell bindings will not be built.")
 	MESSAGE(STATUS "${GHC_DIR_MESSAGE}")
 ENDIF (GHC_FOUND)
-
-# Gnu Scientific Library
-FIND_PACKAGE(GSL)
-IF (GSL_FOUND)
-	MESSAGE(STATUS "GSL found.")
-	ADD_DEFINITIONS(-DHAVE_GSL)
-	SET(HAVE_GSL 1)
-ELSE (GSL_FOUND)
-	MESSAGE(STATUS "GSL missing: needed for the AtomSpace.")
-ENDIF (GSL_FOUND)
 
 # This is required for Guile
 FIND_LIBRARY(GMP_LIBRARY gmp)
@@ -244,28 +256,6 @@ ELSE (GUILE_FOUND AND GMP_LIBRARY AND GMP_INCLUDE_DIR)
 	MESSAGE(STATUS "${GUILE_DIR_MESSAGE}")
 ENDIF (GUILE_FOUND AND GMP_LIBRARY AND GMP_INCLUDE_DIR)
 
-# Hypertable library, for atomspace persistence
-FIND_PACKAGE(HyperTable)
-IF (HYPERTABLE_FOUND)
-	ADD_DEFINITIONS(-DHAVE_HYPERTABLE)
-	SET(HAVE_HYPERTABLE 1)
-	MESSAGE(STATUS "Hypertable was found.")
-
-	# Don't bother looking for SIGAR unlesss hyperable was found.
-	FIND_PACKAGE(SIGAR)
-	IF (SIGAR_FOUND)
-	ELSE (SIGAR_FOUND)
-		MESSAGE(WARNING "SIGAR was not found! It is needed for Hypertable support.")
-	ENDIF (SIGAR_FOUND)
-
-ELSE (HYPERTABLE_FOUND)
-	# The FindHypertable.cmake file already prints a message.
-	# MESSAGE(STATUS "Hypertable was not found; hypertable support will not be built.\n   To over-ride, make sure HYPERTABLE_LIBRARIES and HYPERTABLE_INCLUDE_DIRS\n   are set.")
-	MESSAGE(STATUS "Hypertable not found; the experimental distributed persistence DB needs it.")
-
-ENDIF (HYPERTABLE_FOUND)
-
-
 # Lapack is needed for BLOPEX
 FIND_PACKAGE(LAPACK)
 IF (LAPACK_FOUND)
@@ -277,29 +267,38 @@ ELSE (LAPACK_FOUND)
 ENDIF (LAPACK_FOUND)
 
 
-# Link-Gramar is needed for the Viterbi parser
-# Only 4.7.12 or newer has the required read-dict API in it.
-FIND_PACKAGE(LinkGrammar 4.7.12)
+# Link-Gramar is needed for several NLP subsystems
+# Only 5.4.0 or newer has the required API in it.
+FIND_PACKAGE(LinkGrammar 5.4.0)
 IF (LINK_GRAMMAR_FOUND)
 	SET(HAVE_LINK_GRAMMAR 1)
 	INCLUDE_DIRECTORIES(${LINK_GRAMMAR_INCLUDE_DIRS})
 ELSE (LINK_GRAMMAR_FOUND)
-	MESSAGE(STATUS "Link Grammar missing: needed for the Viterbi parser.")
+	MESSAGE(STATUS "Link Grammar missing: needed for NLP.")
 ENDIF (LINK_GRAMMAR_FOUND)
 
 
-# MOSES needed for embodiment learning...
+# MOSES needed for ???
 FIND_PACKAGE(MOSES)
 
 IF (MOSES_FOUND)
 	MESSAGE(STATUS "MOSES was found.")
 	ADD_DEFINITIONS(-DHAVE_MOSES)
 	SET(HAVE_MOSES 1)
-	SET(HAVE_COMBOREDUCT 1)
-	SET(HAVE_FEATURE_SELECTION 1)
 ELSE (MOSES_FOUND)
 	MESSAGE(STATUS "MOSES missing: needed for embodiment.")
 ENDIF (MOSES_FOUND)
+
+# Octomap
+FIND_PACKAGE(Octomap)
+IF(OCTOMAP_FOUND AND OCTOMAP_LIBRARY)
+  ADD_DEFINITIONS(-DHAVE_OCTOMAP)
+  SET(HAVE_OCTOMAP 1)
+  INCLUDE_DIRECTORIES(${OCTOMAP_INCLUDE_DIR})
+  SET(OCTOMAP_DIR_MESSAGE "Octomap was found.")
+ELSE (OCTOMAP_FOUND AND OCTOMAP_LIBRARY)
+  SET(OCTOMAP_DIR_MESSAGE "Octomap missing: needed for the SpaceTime map.")
+ENDIF(OCTOMAP_FOUND AND OCTOMAP_LIBRARY)
 
 
 # OpenGL needed for visualization...
@@ -308,15 +307,12 @@ FIND_PACKAGE(OpenGL)
 IF (OPENGL_FOUND)
 	MESSAGE(STATUS "OpenGL was found.")
 ELSE (OPENGL_FOUND)
-	MESSAGE(STATUS "OpenGL missing: needed for Spatial tools (MapExplorer, MapTools, etc.).")
+	MESSAGE(STATUS "OpenGL missing: needed for space visualization tools (MapExplorer, MapTools, etc.).")
 ENDIF (OPENGL_FOUND)
-
-# At this time, there is no reason to build with memcached for
-# FIND_PACKAGE(LibMemCached)
 
 # Google Protobuf library
 # The protocol buffer compiler is a separately installable package, and
-# it is also needed for building embodiment PAI. So check for that, too.
+# it is needed for building the ZMQ messaging subsystem.
 FIND_PACKAGE(Protobuf)
 IF (PROTOBUF_FOUND
 		AND PROTOBUF_LIBRARY
@@ -337,7 +333,7 @@ ELSE (PROTOBUF_FOUND
 	IF (PROTOBUF_PROTOC_EXECUTABLE)
 		SET(PROTOBUF_DIR_MESSAGE "Protobuf was not found; the new message decoding functions would not work.\n   To over-ride, make sure PROTOBUF_LIBRARIES and PROTOBUF_INCLUDE_DIRS are set.")
 	ELSE (PROTOBUF_PROTOC_EXECUTABLE)
-		SET(PROTOBUF_DIR_MESSAGE "Protobuf compiler was not found; embodiment PAI can't be built without it.\n   To over-ride, make sure PROTOBUF_PROTOC_EXECUTABLE is set.")
+		SET(PROTOBUF_DIR_MESSAGE "Protobuf compiler was not found; ZMQ messaging can't be built without it.\n   To over-ride, make sure PROTOBUF_PROTOC_EXECUTABLE is set.")
 	ENDIF (PROTOBUF_PROTOC_EXECUTABLE)
 
 ENDIF (PROTOBUF_FOUND
@@ -347,45 +343,74 @@ ENDIF (PROTOBUF_FOUND
 
 MESSAGE(STATUS "${PROTOBUF_DIR_MESSAGE}")
 
-# Python needed for embodiment (!?) and for PLN
-FIND_PACKAGE(PythonInterp)
-FIND_PACKAGE(PythonLibs 2.7)
-IF(PYTHONLIBS_FOUND)
-	MESSAGE(STATUS "Python libs found.")
-ELSE(PYTHONLIBS_FOUND)
-	MESSAGE(STATUS "Python libs NOT found.")
-ENDIF(PYTHONLIBS_FOUND)
+# -----------------------------------------------------------------------------
+# Python and Cython
+#
+# NOTE: Python interpreter is needed for runing python unit tests,
+# and for running the FindCython module.
 
-# Python bindings using Cython
-# Cython is used to generate bindings
-FIND_PACKAGE(Cython 0.19.0)
-IF (CYTHON_FOUND AND PYTHONLIBS_FOUND)
-	# find python destination dir for python bindings
-	ADD_DEFINITIONS(-DHAVE_CYTHON)
-	SET(HAVE_CYTHON 1)
-	EXECUTE_PROCESS(
-		COMMAND ${PYTHON_EXECUTABLE} -c "from distutils.sysconfig import *;print(get_python_lib())"
-		OUTPUT_VARIABLE PYTHON_DEST
-	)
+FIND_PACKAGE(Python3Interp)
+IF (3.4.0 VERSION_LESS ${PYTHON3_VERSION_STRING})
+	SET (HAVE_PY_INTERP 1)
+	SET (PYTHON_VER python3.5)
+	MESSAGE(STATUS "Python ${PYTHON3_VERSION_STRING} interpreter found.")
+ENDIF()
 
-	# replace new line at end
-	STRING(REPLACE "\n" "" PYTHON_DEST "${PYTHON_DEST}")
-	IF ("${PYTHON_DEST}" STREQUAL "")
-		MESSAGE(FATAL_ERROR "Python destination dir not found")
-	ELSE ("${PYTHON_DEST}" STREQUAL "")
-		MESSAGE(STATUS "Python destination dir found: ${PYTHON_DEST}" )
-	ENDIF ("${PYTHON_DEST}" STREQUAL "")
-ELSE (CYTHON_FOUND AND PYTHONLIBS_FOUND)
-	IF(NOT CYTHON_FOUND)
-		MESSAGE(STATUS "Cython executable not found.")
-	ENDIF(NOT CYTHON_FOUND)
-ENDIF (CYTHON_FOUND AND PYTHONLIBS_FOUND)
+IF (NOT HAVE_PY_INTERP)
+	FIND_PACKAGE(PythonInterp)
+	IF (2.7.0 VERSION_LESS ${PYTHON_VERSION_STRING})
+		SET (HAVE_PY_INTERP 1)
+		SET (PYTHON_VER python2.7)
+		MESSAGE(STATUS "Python ${PYTHON_VERSION_STRING} interpreter found.")
+	ENDIF()
+ENDIF()
 
-# Nosetests will find and automatically run python tests.
-FIND_PROGRAM(NOSETESTS_EXECUTABLE nosetests)
-IF (NOSETESTS_EXECUTABLE AND CYTHON_FOUND AND PYTHONLIBS_FOUND)
-	SET(HAVE_NOSETESTS 1)
-ENDIF (NOSETESTS_EXECUTABLE AND CYTHON_FOUND AND PYTHONLIBS_FOUND)
+FIND_PACKAGE(PythonLibs)
+IF (PYTHONLIBS_FOUND AND
+     ((PYTHON3INTERP_FOUND AND 3.4.0 VERSION_LESS ${PYTHONLIBS_VERSION_STRING})
+     OR
+     (2.7.0 VERSION_LESS ${PYTHONLIBS_VERSION_STRING})))
+	SET (HAVE_PY_LIBS 1)
+	MESSAGE(STATUS "Python ${PYTHONLIBS_VERSION_STRING} libraries found.")
+ELSE()
+	MESSAGE(STATUS "Python libraries NOT found.")
+ENDIF()
+
+# Cython is used to generate python bindings.
+IF (HAVE_PY_INTERP)
+	FIND_PACKAGE(Cython 0.19.0)
+
+	IF (CYTHON_FOUND AND HAVE_PY_LIBS)
+		# Find python destination dir for python bindings because it may
+		# differ on each operating system.
+		ADD_DEFINITIONS(-DHAVE_CYTHON)
+		SET(HAVE_CYTHON 1)
+
+		# Hack together some reasonable install location.
+		SET(PYTHON_DEST
+			"lib${LIB_DIR_SUFFIX}/${PYTHON_VER}/dist-packages/opencog")
+		MESSAGE(STATUS
+			"Python install dir: ${CMAKE_INSTALL_PREFIX}/${PYTHON_DEST}" )
+
+	ELSE (CYTHON_FOUND AND HAVE_PY_LIBS)
+		IF(NOT CYTHON_FOUND)
+			MESSAGE(STATUS "Cython executable not found.")
+		ENDIF(NOT CYTHON_FOUND)
+	ENDIF (CYTHON_FOUND AND HAVE_PY_LIBS)
+
+	# Nosetests will find and automatically run python tests.
+	IF (PYTHON3INTERP_FOUND)
+		FIND_PROGRAM(NOSETESTS_EXECUTABLE nosetests3)
+	ELSE ()
+		FIND_PROGRAM(NOSETESTS_EXECUTABLE nosetests)
+	ENDIF ()
+	IF (NOSETESTS_EXECUTABLE AND CYTHON_FOUND AND HAVE_PY_LIBS)
+		SET(HAVE_NOSETESTS 1)
+		MESSAGE(STATUS "Using nosetests executable " ${NOSETESTS_EXECUTABLE})
+	ENDIF (NOSETESTS_EXECUTABLE AND CYTHON_FOUND AND HAVE_PY_LIBS)
+ENDIF (HAVE_PY_INTERP)
+
+# -----------------------------------------------------------------------------
 
 # SDL needed for the spatial tools
 FIND_PACKAGE(SDL)
@@ -413,43 +438,6 @@ ELSE (TBB_FOUND)
 ENDIF (TBB_FOUND)
 MESSAGE(STATUS "${TBB_DIR_MESSAGE}")
 
-FIND_PACKAGE(TCL)
-
-# /usr/bin/tclsh is expected for some embodiment tests, but is
-# not otherwise important for anything...
-IF (TCL_TCLSH)
-	MESSAGE(STATUS "TCL shell was found here: ${TCL_TCLSH}")
-ELSE (TCL_TCLSH)
-	MESSAGE(STATUS "TCL shell missing: needed for some embodiment tests.")
-ENDIF (TCL_TCLSH)
-
-# Enable the hypergraph persistence module, if unixodbc is found.
-# In principle, iODBC could be used; however, iODBC is buggy when
-# used with UTF8/unicode node names, and fails miserably. Thus,
-# only UnixODBC is supported at this time.
-#
-# FIND_PACKAGE(IODBC QUIET)
-# IF (IODBC_FOUND)
-# 	ADD_DEFINITIONS(-DHAVE_SQL_STORAGE)
-# 	SET(ODBC_FOUND 1)
-# 	SET(ODBC_INCLUDE_DIRS ${IODBC_INCLUDE_DIRS})
-# 	SET(ODBC_LIBRARIES ${IODBC_LIBRARIES})
-# ENDIF (IODBC_FOUND)
-
-FIND_PACKAGE(UnixODBC QUIET)
-IF (UnixODBC_FOUND)
-	ADD_DEFINITIONS(-DHAVE_SQL_STORAGE)
-	SET(HAVE_SQL_STORAGE 1)
-	SET(ODBC_FOUND 1)
-	SET(ODBC_INCLUDE_DIRS ${UnixODBC_INCLUDE_DIRS})
-	SET(ODBC_LIBRARIES ${UnixODBC_LIBRARIES})
-	SET(ODBC_DIR_MESSAGE "UnixODBC was found.")
-ELSE (UnixODBC_FOUND)
-	SET(ODBC_FOUND 0)
-	SET(ODBC_DIR_MESSAGE "UnixODBC was not found; persistence subsystem will not be built.\nTo over-ride, make sure UnixODBC_LIBRARIES and UnixODBC_INCLUDE_DIRS are set.")
-ENDIF (UnixODBC_FOUND)
-MESSAGE(STATUS "${ODBC_DIR_MESSAGE}")
-
 # Optional, currently needed only to hush up DRD in util/Logger.cc
 FIND_PACKAGE(VALGRIND)
 IF (VALGRIND_FOUND)
@@ -464,27 +452,6 @@ ELSE (VALGRIND_FOUND)
 	MESSAGE(STATUS "VALGRIND missing: needed for thread debugging.")
 ENDIF (VALGRIND_FOUND)
 
-# These are required for building the embodiment code
-FIND_PACKAGE(XercesC)
-IF (XERCESC_FOUND)
-	IF ("${XERCESC_VERSION}" VERSION_LESS "3.0.0")
-		MESSAGE(WARNING "Xerces ${XERCESC_VERSION} not supported. Only versions 3.* are supported. Embodiment won't be built.")
-		SET(XERCESC_VERSION_OK FALSE)
-	ELSE ("${XERCESC_VERSION}" VERSION_LESS "3.0.0")
-		MESSAGE(STATUS "Found Xerces ${XERCESC_VERSION} -- ${XERCESC_LIBRARIES}")
-		INCLUDE_DIRECTORIES(${XERCESC_INCLUDE})
-		SET(XERCESC_VERSION_OK TRUE)
-	ENDIF ("${XERCESC_VERSION}" VERSION_LESS "3.0.0")
-ELSE (XERCESC_FOUND)
-	MESSAGE(STATUS "Xerces-C missing: needed for embodiment")
-ENDIF (XERCESC_FOUND)
-
-# XML-RPC, used by the ubigraph module
-FIND_PACKAGE(XMLRPC COMPONENTS client)
-IF (NOT XMLRPC_FOUND)
-	MESSAGE(STATUS "libxmlrpc missing: needed for ubigraph module.")
-ENDIF (NOT XMLRPC_FOUND)
-
 # ZeroMQ
 FIND_PACKAGE(ZMQ 3.2.4)
 IF (ZMQ_FOUND AND ZMQ_LIBRARY)
@@ -496,53 +463,44 @@ ELSE (ZMQ_FOUND AND ZMQ_LIBRARY)
 ENDIF (ZMQ_FOUND AND ZMQ_LIBRARY)
 MESSAGE(STATUS "${ZMQ_DIR_MESSAGE}")
 
+# Glasgow Haskell compiler
+FIND_PACKAGE(Stack)
+IF (STACK_FOUND)
+	ADD_DEFINITIONS(-DHAVE_STACK)
+	SET(HAVE_STACK 1)
+	SET(STACK_FOUND_MESSAGE "The Haskell Tool Stack found.")
+ELSE (STACK_FOUND)
+	SET(STACK_FOUND_MESSAGE "The Haskell Tool Stack not found.")
+ENDIF (STACK_FOUND)
+MESSAGE(STATUS "${STACK_FOUND_MESSAGE}")
+
 # ==========================================================
 # Decide what to build, based on the packages found.
 
 IF(Boost_FOUND)
 ENDIF(Boost_FOUND)
 
-IF(GSL_FOUND AND HAVE_COGUTIL)
-	SET(HAVE_ATOMSPACE 1)
+IF(HAVE_ATOMSPACE AND HAVE_COGUTIL)
 	SET(HAVE_ATTENTION 1)
 	SET(HAVE_DIMEMBED 1)
-ENDIF(GSL_FOUND AND HAVE_COGUTIL)
+	SET(HAVE_STATISTICS 1)
+ENDIF(HAVE_ATOMSPACE AND HAVE_COGUTIL)
 
 IF(Boost_PROGRAM_OPTIONS_FOUND AND OPENGL_FOUND AND SDL_FOUND AND SDLGFX_FOUND)
 	SET(HAVE_SPATIAL_TOOLS 1)
 ENDIF(Boost_PROGRAM_OPTIONS_FOUND AND OPENGL_FOUND AND SDL_FOUND AND SDLGFX_FOUND)
 
-# FYI, at this time, no part of opencog depends on expat being installed!
-IF(EXPAT_FOUND AND HAVE_ATOMSPACE)
-	SET(HAVE_XML 1)
-ENDIF(EXPAT_FOUND AND HAVE_ATOMSPACE)
-
 IF(HAVE_ATOMSPACE)
 	SET(HAVE_SERVER 1)
 ENDIF(HAVE_ATOMSPACE)
 
-IF(HAVE_ATOMSPACE AND ODBC_FOUND) # SQL persistance
-	SET(HAVE_PERSIST 1)
-ENDIF(HAVE_ATOMSPACE AND ODBC_FOUND)
-
-IF(XERCESC_VERSION_OK)
-	SET(HAVE_EMBODIMENT 1)
-ENDIF(XERCESC_VERSION_OK)
-
-IF (CURL_FOUND AND XMLRPC_FOUND)
-	ADD_DEFINITIONS(-DHAVE_UBIGRAPH)
-	SET(HAVE_UBIGRAPH 1)
-ENDIF (CURL_FOUND AND XMLRPC_FOUND)
-
 IF(HAVE_ATOMSPACE AND HAVE_GUILE AND HAVE_LINK_GRAMMAR)
-	SET(HAVE_VITERBI 1)
+	SET(HAVE_NLP 1)
 ENDIF(HAVE_ATOMSPACE AND HAVE_GUILE AND HAVE_LINK_GRAMMAR)
 
-# At this time, there is no reason to build with memcached for
-# any "normal" use, so just stub it out.
-# IF (LIBMEMCACHED_FOUND)
-#	ADD_DEFINITIONS(-DHAVE_LIBMEMCACHED)
-# ENDIF (LIBMEMCACHED_FOUND)
+IF(HAVE_SERVER AND HAVE_TBB AND HAVE_ZMQ)
+	SET(HAVE_EVENT_PUBLISHING_DEPENDENCIES 1)
+ENDIF(HAVE_SERVER AND HAVE_TBB AND HAVE_ZMQ)
 
 # ===================================================================
 # global includes
@@ -562,6 +520,7 @@ SET (MAN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/share/man")
 
 # include custom opencog cmake macros
 INCLUDE("${CMAKE_SOURCE_DIR}/lib/OpenCogMacros.cmake")
+INCLUDE("${CMAKE_SOURCE_DIR}/lib/OpenCogFunctions.cmake")
 
 # small hack to handle unixes that use "/usr/lib64" instead of "/usr/lib" as the
 # default lib path on 64 bit archs
@@ -577,12 +536,14 @@ IF (NOT DEFINED LIB_DIR_SUFFIX)
 ENDIF (NOT DEFINED LIB_DIR_SUFFIX)
 
 # set default include paths
-INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR} ${Boost_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR} ${Boost_INCLUDE_DIRS}
+	${COGUTIL_INCLUDE_DIR} ${ATOMSPACE_INCLUDE_DIR})
 
 # rpath handling
 SET(CMAKE_SKIP_BUILD_RPATH	FALSE)
 SET(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
-SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/opencog")
+SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/opencog"
+                        "${CMAKE_INSTALL_PREFIX}/lib/opencog//modules")
 SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 ADD_SUBDIRECTORY(lib)
@@ -603,7 +564,8 @@ IF (CXXTEST_FOUND)
 			# and cmake has no way to add non-test dependencies to tests
 			DEPENDS tests cogserver
 			WORKING_DIRECTORY tests
-			COMMAND ${CMAKE_CTEST_COMMAND} --force-new-ctest-process $(ARGS)
+			COMMAND ${CMAKE_CTEST_COMMAND} --force-new-ctest-process --output-on-failure $(ARGS)
+
 			# This script combines the coverage analysis of each test,
 			# then creates html in tests/lcov
 			# Note: this should now be run separately...
@@ -615,7 +577,7 @@ IF (CXXTEST_FOUND)
 		ADD_CUSTOM_TARGET(test
 			DEPENDS tests
 			WORKING_DIRECTORY tests
-			COMMAND ${CMAKE_CTEST_COMMAND} --force-new-ctest-process $(ARGS)
+			COMMAND ${CMAKE_CTEST_COMMAND} --force-new-ctest-process --output-on-failure $(ARGS)
 			COMMENT "Running tests..."
 		)
 	ENDIF (CMAKE_BUILD_TYPE STREQUAL "Coverage")
@@ -663,6 +625,23 @@ ADD_CUSTOM_TARGET(cscope
 	COMMENT "Generating CScope database"
 )
 
+ADD_SUBDIRECTORY(experiments EXCLUDE_FROM_ALL)
+
+IF (NOT WIN32)
+	ADD_CUSTOM_TARGET (experiments
+		# using CMAKE_BUILD_TOOL results in teh cryptic error message
+		# warning: jobserver unavailable: using -j1.  Add `+' to parent make rule.
+		# This is because make doesn't know how to pass jobserver args to
+		# the submake.  So, instead, just use $(MAKE) (with round parens)
+		# -- that will do the right thing.
+		# COMMAND ${CMAKE_BUILD_TOOL}
+		COMMAND $(MAKE)
+		WORKING_DIRECTORY experiments
+		COMMENT "Building experiments"
+	)
+ENDIF (NOT WIN32)
+
+
 # packaging
 SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Open Cognition Framework")
 SET(CPACK_PACKAGE_NAME "opencog")
@@ -672,6 +651,7 @@ SET(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 SET(CPACK_PACKAGE_VERSION_MAJOR "0")
 SET(CPACK_PACKAGE_VERSION_MINOR "1")
 SET(CPACK_PACKAGE_VERSION_PATCH "4")
+SET(CPACK_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
 SET(CPACK_BINARY_STGZ "OFF")
 SET(CPACK_BINARY_TBZ2 "OFF")
 SET(CPACK_BINARY_TGZ "OFF")
@@ -680,9 +660,10 @@ SET(CPACK_SOURCE_STGZ "OFF")
 SET(CPACK_SOURCE_TBZ2 "ON")
 SET(CPACK_SOURCE_TGZ "OFF")
 SET(CPACK_SOURCE_TZ "OFF")
-SET(CPACK_GENERATOR "TBZ2")
+SET(CPACK_PACKAGE_CONTACT "opencog@googlegroups.com")
+SET(CPACK_GENERATOR "TBZ2;DEB")
 SET(CPACK_SOURCE_GENERATOR "TBZ2")
-SET(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
+SET(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
 SET(CPACK_SOURCE_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}")
 SET(CPACK_SOURCE_IGNORE_FILES
 	"~$"
@@ -714,10 +695,17 @@ SET(CPACK_SOURCE_IGNORE_FILES
 	"^${PROJECT_SOURCE_DIR}/.bzr/"
 	"^${PROJECT_SOURCE_DIR}/.bzrignore$"
 	"^${PROJECT_SOURCE_DIR}/.git/"
-	"^${PROJECT_BINARY_DIR}/opencog/server/cogserver$"
+	"^${PROJECT_BINARY_DIR}/opencog/cogserver/server/cogserver$"
 	"^${PROJECT_BINARY_DIR}/examples/server/derivedserver$"
 	"^${PROJECT_BINARY_DIR}/examples/hopfield/hopfield$"
+	"^${PROJECT_SOURCE_DIR}/opencog/python/__init__.py$"
 )
+
+SET(CPACK_PACKAGING_INSTALL_PREFIX "/usr/local")
+SET(CPACK_DEBIAN_PACKAGE_DEPENDS
+    "atomspace (>= 5.0.3)"
+)
+
 SET(CPACK_PACKAGE_INSTALL_DIRECTORY "CMake ${CMake_VERSION_MAJOR}.${CMake_VERSION_MINOR}")
 IF (WIN32)
 	# Its "not unix" is cygwin is being used.
@@ -746,24 +734,21 @@ FIND_PACKAGE(Doxygen)
 ADD_SUBDIRECTORY(doc EXCLUDE_FROM_ALL)
 
 # Show a summary of what we got
-SUMMARY_ADD("AtomSpace" "A weighted and typed hypergraph database" HAVE_ATOMSPACE)
 SUMMARY_ADD("Attention" "Agents for attention allocation dynamics" HAVE_ATTENTION)
 SUMMARY_ADD("Blopex" "BLOPEX block eigenvalue solver" HAVE_LAPACK)
 SUMMARY_ADD("Cython bindings" "Cython (python) bindings" HAVE_CYTHON)
 SUMMARY_ADD("Dim. Embedding" "Compute dimensional embedding of the AtomSpace" HAVE_DIMEMBED)
 SUMMARY_ADD("Doxygen" "Code documentation" DOXYGEN_FOUND)
-SUMMARY_ADD("Embodiment" "Architecture for embodiment" HAVE_EMBODIMENT)
-SUMMARY_ADD("Learning Server" "Embodiment Learning" HAVE_MOSES)
 SUMMARY_ADD("GTK Visualizer" "GTK3-based Atomspace Visualizer" HAVE_GTK)
-SUMMARY_ADD("Hypertable" "HyperTable for scalable persistance (experimental)" HAVE_HYPERTABLE)
 SUMMARY_ADD("Python tests" "Python bindings nose tests" HAVE_NOSETESTS)
-SUMMARY_ADD("Scheme bindings" "Scheme bindings and shell" HAVE_GUILE)
+SUMMARY_ADD("REST Events" "REST Atomspace Event Publisher module"
+	HAVE_EVENT_PUBLISHING_DEPENDENCIES)
 SUMMARY_ADD("Server" "The CogServer" HAVE_SERVER)
-SUMMARY_ADD("Spatial" "Vizualisation of the 3D spacemap" HAVE_SPATIAL_TOOLS)
-SUMMARY_ADD("SQL persistance" "Save/Restore of AtomSpace to database" HAVE_PERSIST)
-SUMMARY_ADD("Ubigraph" "Visualisation of the AtomSpace" HAVE_UBIGRAPH)
+SUMMARY_ADD("SpaceTime" "3D Space-Time object tracker" HAVE_OCTOMAP)
+SUMMARY_ADD("Spatial" "Vizualisation of the 3D spacemap" HAVE_SPATIAL_TOOLS AND HAVE_OCTOMAP)
 SUMMARY_ADD("Unit tests" "Unit tests" CXXTEST_FOUND)
-SUMMARY_ADD("Viterbi" "Viterbi Parser for Link Grammar" HAVE_VITERBI)
-SUMMARY_ADD("ZMQ" "ZMQ-based OAC GUI reports, AtomSpace publisher module" HAVE_ZMQ)
-SUMMARY_ADD("TBB" "Intel TBB (Threaded Building Blocks) for multithreading" HAVE_TBB)
+SUMMARY_ADD("NLP" "Natural Language Processing" HAVE_NLP)
+SUMMARY_ADD("PatternMiner" "Pattern Miner" HAVE_ATOMSPACE)
+SUMMARY_ADD("Haskell codes" "Logic via Lojban" HAVE_STACK AND BUILD_LOJBAN)
+
 SUMMARY_SHOW()

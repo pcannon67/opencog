@@ -2,39 +2,32 @@
                   OpenCog Source Code
                   -------------------
 
-This directory contains core OpenCog code.  Tests, example and demo 
-programs have their own directories.
+This directory contains core OpenCog code.  Tests and examples
+are located one directory up from this.
 
 Source code overview:
 
-atomspace       -- Defines atoms, nodes, links, truth values, etc. 
-                   Everything else depends on this.
+scm             -- Scheme language bindings.
+python,cython   -- Python language bindings.
 
-persist         -- Methods for communication between servers, also,
-                   saving/restoring the atomspace to disk, database, etc.
+nlp             -- English language processing tools.
+                   Includes various chatbots.
 
-query           -- Pattern matching, evaluation for the atomspace.
+ghost           -- A behavior-scripting system.
 
-guile, scm      -- Scheme language bindings.
-python,cython   -- Python langauge bindings.  
-shell           -- Command-line shell interface.
+pln             -- Probabilistic logic reasoner.
+attention       -- ECAN Attention allocation.
 
-server          -- CogServer main server.
-benchmark       -- Performance benchmarks.
+cogserver       -- Multi-user network server.
 
-nlp             -- English language processing
-reasoning       -- Backward-chainers
+spacetime       -- Tag atoms with 3D spatial and time coordinates.
+                   DEPRECATED. Do not use in new code!
 
-dynamics        -- Attention allocation.
-spatial, spacetime -- Space and time matrix for avatars.
-embodiment      -- Avatars
+eva             -- Code to control the Hanson Robotics Eva robot.
+                   Includes perception (vision, sound), chat and
+                   behavior subsystems.
 
-comboreduct     -- Combo language, term-rewriting system.
-learning        -- Supervised program learning, including MOSES
+learning        -- Misc supervised learning algorithms.
+                   Most importantly, the pattern miner.
 
 visualization   -- Visualization, graphics.
-
-cycl-import     -- Import OpenCyc datasets
-
-@todo Create doxygen filter to parse scm files.
-

@@ -23,23 +23,29 @@
  */
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <limits>
 #include <numeric>
 #include <string>
 #include <utility>
 
 #include <opencog/atomspaceutils/AtomSpaceUtils.h>
-#include <opencog/atomspace/ClassServer.h>
-#include <opencog/atomspace/SimpleTruthValue.h>
+#include <opencog/atoms/proto/NameServer.h>
+#include <opencog/atoms/base/Link.h>
+#include <opencog/atoms/base/Node.h>
+#include <opencog/truthvalue/SimpleTruthValue.h>
 #include <opencog/guile/SchemePrimitive.h>
 #include <opencog/util/exceptions.h>
 #include <opencog/util/Logger.h>
+
 extern "C" {
 #include <opencog/util/cluster.h>
 }
+
 #include "DimEmbedModule.h"
 
 using namespace opencog;
+using namespace std::placeholders;
 
 typedef std::vector<std::pair<HandleSeq,std::vector<double> > >
     ClusterSeq; //the vector of doubles is the centroid of the cluster
@@ -49,21 +55,23 @@ DECLARE_MODULE(DimEmbedModule)
 DimEmbedModule::DimEmbedModule(CogServer& cs) : Module(cs)
 {
     logger().info("[DimEmbedModule] constructor");
-    this->as = &_cogserver.getAtomSpace();
+    as = &_cogserver.getAtomSpace();
+    _bank = &attentionbank(as);
+
     addedAtomConnection = as->
-        addAtomSignal(boost::bind(&DimEmbedModule::handleAddSignal, this, _1));
+        atomAddedSignal().connect(std::bind(&DimEmbedModule::handleAddSignal, this, _1));
     removedAtomConnection = as->
-        removeAtomSignal(boost::bind(&DimEmbedModule::atomRemoveSignal, this, _1));
+        atomRemovedSignal().connect(std::bind(&DimEmbedModule::atomRemoveSignal, this, _1));
     tvChangedConnection = as->
-        TVChangedSignal(boost::bind(&DimEmbedModule::TVChangedSignal, this, _1, _2, _3));
+        TVChangedSignal().connect(std::bind(&DimEmbedModule::TVChangedSignal, this, _1, _2, _3));
 }
 
 DimEmbedModule::~DimEmbedModule()
 {
     logger().info("[DimEmbedModule] destructor");
-    addedAtomConnection.disconnect();   
-    removedAtomConnection.disconnect();
-    tvChangedConnection.disconnect();
+    as->atomAddedSignal().disconnect(addedAtomConnection);
+    as->atomRemovedSignal().disconnect(removedAtomConnection);
+    as->TVChangedSignal().disconnect(tvChangedConnection);
 }
 
 void DimEmbedModule::init()
@@ -71,11 +79,11 @@ void DimEmbedModule::init()
     logger().info("[DimEmbedModule] init");
     this->as = &_cogserver.getAtomSpace();
     addedAtomConnection = as->
-        addAtomSignal(boost::bind(&DimEmbedModule::handleAddSignal, this, _1));
+        atomAddedSignal().connect(std::bind(&DimEmbedModule::handleAddSignal, this, _1));
     removedAtomConnection = as->
-        removeAtomSignal(boost::bind(&DimEmbedModule::atomRemoveSignal, this, _1));
+        atomRemovedSignal().connect(std::bind(&DimEmbedModule::atomRemoveSignal, this, _1));
     tvChangedConnection = as->
-        TVChangedSignal(boost::bind(&DimEmbedModule::TVChangedSignal, this, _1, _2, _3));
+        TVChangedSignal().connect(std::bind(&DimEmbedModule::TVChangedSignal, this, _1, _2, _3));
 #ifdef HAVE_GUILE
     //Functions available to scheme shell
     define_scheme_primitive("embedSpace",
@@ -84,9 +92,9 @@ void DimEmbedModule::init()
     define_scheme_primitive("logEmbedding",
                             &DimEmbedModule::logAtomEmbedding,
                             this);
-    define_scheme_primitive("euclidDist",
-                            &DimEmbedModule::euclidDist,
-                            this);
+//    define_scheme_primitive("euclidDist",
+//                            &DimEmbedModule::euclidDist,
+//                            this);
     define_scheme_primitive("kNN",
                             &DimEmbedModule::kNearestNeighbors,
                             this);
@@ -100,18 +108,18 @@ const std::vector<double>& DimEmbedModule::getEmbedVector(Handle h,
                                                           Type l,
                                                           bool fanin) const
 {
-    if (!classserver().isLink(l))
+    if (!nameserver().isLink(l))
         throw InvalidParamException(TRACE_INFO,
             "DimensionalEmbedding requires link type, not %s",
-            classserver().getTypeName(l).c_str());
+            nameserver().getTypeName(l).c_str());
 
     if (!isEmbedded(l)) {
-        const char* tName = classserver().getTypeName(l).c_str();
+        const char* tName = nameserver().getTypeName(l).c_str();
         logger().error("No embedding exists for type %s", tName);
         throw std::string("No embedding exists for type %s", tName);
     }
 
-    bool symmetric = classserver().isA(l,UNORDERED_LINK);
+    bool symmetric = nameserver().isA(l,UNORDERED_LINK);
     if (symmetric) {
         const AtomEmbedding& aE = (atomMaps.find(l))->second;
         //AtomEmbedding::const_iterator aEit = aE.find(h);
@@ -134,16 +142,16 @@ const std::vector<double>& DimEmbedModule::getEmbedVector(Handle h,
 
 HandleSeq& DimEmbedModule::getPivots(Type l, bool fanin)
 {
-    if (!classserver().isLink(l))
+    if (!nameserver().isLink(l))
         throw InvalidParamException(TRACE_INFO,
             "DimensionalEmbedding requires link type, not %s",
-            classserver().getTypeName(l).c_str());
+            nameserver().getTypeName(l).c_str());
     if (!isEmbedded(l)) {
-        const char* tName = classserver().getTypeName(l).c_str();
+        const char* tName = nameserver().getTypeName(l).c_str();
         logger().error("No embedding exists for type %s", tName);
         throw std::string("No embedding exists for type %s", tName);
     }
-    bool symmetric = classserver().isA(l,UNORDERED_LINK);
+    bool symmetric = nameserver().isA(l,UNORDERED_LINK);
     if (symmetric) {
         return pivotsMap.find(l)->second;
     } else {
@@ -154,34 +162,34 @@ HandleSeq& DimEmbedModule::getPivots(Type l, bool fanin)
 
 HandleSeq DimEmbedModule::kNearestNeighbors(Handle h, Type l, int k, bool fanin)
 {
-    if (!classserver().isLink(l))
+    if (!nameserver().isLink(l))
         throw InvalidParamException(TRACE_INFO,
             "DimensionalEmbedding requires link type, not %s",
-            classserver().getTypeName(l).c_str());
+            nameserver().getTypeName(l).c_str());
     //logger().info("%d nearest neighbours start", k);
     if (!isEmbedded(l)) {
-        const char* tName = classserver().getTypeName(l).c_str();
+        const char* tName = nameserver().getTypeName(l).c_str();
         logger().error("No embedding exists for type %s", tName);
         throw std::string("No embedding exists for type %s", tName);
     }
-    bool symmetric = classserver().isA(l,UNORDERED_LINK);
+    bool symmetric = nameserver().isA(l,UNORDERED_LINK);
 
     std::vector<CoverTreePoint> points;
     if (symmetric) {
         EmbedTreeMap::const_iterator it = embedTreeMap.find(l);
         points =
-            it->second.kNearestNeighbors(CoverTreePoint(h,atomMaps[l][h]),k);
+            it->second.k_nearest_neighbors(CoverTreePoint(h,atomMaps[l][h]),k);
     } else {
         AsymEmbedTreeMap::const_iterator it = asymEmbedTreeMap.find(l);
         if (fanin) {
             points =
                 it->second.second.
-                kNearestNeighbors(CoverTreePoint(h,asymAtomMaps[l].second[h]),k);
+                k_nearest_neighbors(CoverTreePoint(h,asymAtomMaps[l].second[h]),k);
         }
         else {
             points =
                 it->second.first.
-                kNearestNeighbors(CoverTreePoint(h,asymAtomMaps[l].first[h]),k);
+                k_nearest_neighbors(CoverTreePoint(h,asymAtomMaps[l].first[h]),k);
         }
     }
     HandleSeq results;
@@ -192,18 +200,37 @@ HandleSeq DimEmbedModule::kNearestNeighbors(Handle h, Type l, int k, bool fanin)
     return results;
 }
 
+static bool is_source(const Handle& source, const Handle& link)
+{
+    LinkPtr lptr(LinkCast(link));
+    // On ordered links, only the first position in the outgoing set
+    // is a source of this link. So, if the handle given is equal to
+    // the first position, true is returned.
+    Arity arity = lptr->get_arity();
+    if (nameserver().isA(lptr->get_type(), ORDERED_LINK)) {
+        return arity > 0 and lptr->getOutgoingAtom(0) == source;
+    } else if (nameserver().isA(lptr->get_type(), UNORDERED_LINK)) {
+        // If the link is unordered, the outgoing set is scanned;
+        // return true if any position is equal to the source.
+        for (const Handle& h : lptr->getOutgoingSet())
+            if (h == source) return true;
+        return false;
+    }
+    return false;
+}
+
 void DimEmbedModule::addPivot(Handle h, Type linkType, bool fanin)
 {
-    if (!classserver().isLink(linkType))
+    if (!nameserver().isLink(linkType))
         throw InvalidParamException(TRACE_INFO,
             "DimensionalEmbedding requires link type, not %s",
-            classserver().getTypeName(linkType).c_str());
-    bool symmetric = classserver().isA(linkType,UNORDERED_LINK);
-    if (!fanin) as->incVLTI(h);//We don't want pivot atoms to be forgotten...
+            nameserver().getTypeName(linkType).c_str());
+    bool symmetric = nameserver().isA(linkType,UNORDERED_LINK);
+    if (!fanin) _bank->inc_vlti(h); //We don't want pivot atoms to be forgotten...
     HandleSeq nodes;
-    as->getHandlesByType(std::back_inserter(nodes), NODE, true);
+    as->get_handles_by_type(std::back_inserter(nodes), NODE, true);
 
-    std::map<Handle,double> distMap;
+    std::map<Handle, double> distMap;
 
     typedef std::multimap<double,Handle> pQueue_t;
     pQueue_t pQueue;
@@ -240,18 +267,19 @@ void DimEmbedModule::addPivot(Handle h, Type linkType, bool fanin)
         pQueue.erase(--erase_it);
 
         if (distMap[u]==0) { break;}
-        HandleSeq newLinks = as->getIncoming(u);
+        HandleSeq newLinks;
+        u->getIncomingSet(back_inserter(newLinks));
         for (HandleSeq::iterator it=newLinks.begin(); it!=newLinks.end(); ++it){
             //ignore links that aren't a subtype of linkType
-            if (!classserver().isA(as->getType(*it),linkType)) continue;
-            TruthValuePtr linkTV = as->getTV(*it);
-            HandleSeq newNodes = as->getOutgoing(*it);
+            if (!nameserver().isA((*it)->get_type(), linkType)) continue;
+            TruthValuePtr linkTV = (*it)->getTruthValue();
+            HandleSeq newNodes = (*it)->getOutgoingSet();
             HandleSeq::iterator it2=newNodes.begin();
             //if !fanin, we're following the "outward" links, so it's only a
             //valid link if u is the source
-            if (!symmetric && !fanin && !as->isSource(u,*it)) continue;
+            if (!symmetric && !fanin && !is_source(u,*it)) continue;
             if (!symmetric && fanin) {
-                if (as->isSource(u,*it)) {
+                if (is_source(u,*it)) {
                     continue;
                 }
                 else {
@@ -261,9 +289,9 @@ void DimEmbedModule::addPivot(Handle h, Type linkType, bool fanin)
                 }
             }
             for (;it2!=newNodes.end(); ++it2) {
-                if (!as->isNode(*it2)) continue;
+                if (!(*it2)->is_node()) continue;
                 double alt =
-                    distMap[u] * linkTV->getMean() * linkTV->getConfidence();
+                    distMap[u] * linkTV->get_mean() * linkTV->get_confidence();
                 double oldDist=distMap[*it2];
                 //If we've found a better (higher weight) path, update distMap
                 if (alt>oldDist) {
@@ -292,7 +320,7 @@ void DimEmbedModule::addPivot(Handle h, Type linkType, bool fanin)
 
 Handle DimEmbedModule::pickPivot(Type linkType, HandleSeq& nodes, bool fanin)
 {
-    bool symmetric = classserver().isA(linkType,UNORDERED_LINK);
+    bool symmetric = nameserver().isA(linkType,UNORDERED_LINK);
 
     HandleSeq& pivots = getPivots(linkType,fanin);
     Handle bestChoice = nodes.back();
@@ -321,13 +349,13 @@ Handle DimEmbedModule::pickPivot(Type linkType, HandleSeq& nodes, bool fanin)
 void DimEmbedModule::embedAtomSpace(Type linkType,
                                     int _numDimensions)
 {
-    if (!classserver().isLink(linkType))
+    if (!nameserver().isLink(linkType))
         throw InvalidParamException(TRACE_INFO,
             "DimensionalEmbedding requires link type, not %s",
-            classserver().getTypeName(linkType).c_str());
+            nameserver().getTypeName(linkType).c_str());
     //logger().info("starting embedding");
     clearEmbedding(linkType);
-    bool symmetric = classserver().isA(linkType,UNORDERED_LINK);
+    bool symmetric = nameserver().isA(linkType,UNORDERED_LINK);
     // Scheme wrapper doesn't deal with unsigned ints, so double check it's not
     // negative, or zero for that matter
     int numDimensions = 5;
@@ -337,7 +365,7 @@ void DimEmbedModule::embedAtomSpace(Type linkType,
     dimensionMap[linkType]=numDimensions;
     //const HandleSeq& pivots = getPivots(linkType);
     HandleSeq nodes;//candidates for new pivots
-    as->getHandlesByType(std::back_inserter(nodes), NODE, true);
+    as->get_handles_by_type(std::back_inserter(nodes), NODE, true);
     if (nodes.empty()) return;
     if (nodes.size() < (size_t) numDimensions) numDimensions = nodes.size();
 
@@ -350,7 +378,7 @@ void DimEmbedModule::embedAtomSpace(Type linkType,
         if (!symmetric && !fanin && (nodes.empty() || i==numDimensions-1)) {
             fanin=true;
             nodes.clear();
-            as->getHandlesByType(std::back_inserter(nodes), NODE, true);
+            as->get_handles_by_type(std::back_inserter(nodes), NODE, true);
             i=-1;
         }
 
@@ -389,17 +417,17 @@ void DimEmbedModule::embedAtomSpace(Type linkType,
 std::vector<double> DimEmbedModule::addNode(Handle h,
                                             Type linkType)
 {
-    if (!classserver().isLink(linkType))
+    if (!nameserver().isLink(linkType))
         throw InvalidParamException(TRACE_INFO,
             "DimensionalEmbedding requires link type, not %d \"%s\"",
             linkType,
-            classserver().getTypeName(linkType).c_str());
+            nameserver().getTypeName(linkType).c_str());
     if (!isEmbedded(linkType)) {
-        const char* tName = classserver().getTypeName(linkType).c_str();
+        const char* tName = nameserver().getTypeName(linkType).c_str();
         logger().error("No embedding exists for type \"%s\"", tName);
         throw std::string("No embedding exists for type \"%s\"", tName);
     }
-    bool symmetric = classserver().isA(linkType,UNORDERED_LINK);
+    bool symmetric = nameserver().isA(linkType,UNORDERED_LINK);
     std::vector<double> newEmbedding (dimensionMap[linkType], 0.0);
 
     /* Since addNode is only called just as a new node is added, the new node
@@ -415,7 +443,7 @@ std::vector<double> DimEmbedModule::addNode(Handle h,
     for (HandleSeq::iterator it=links.begin(); it<links.end(); ++it) {
         HandleSeq nodes = a->getOutgoing(*it);
         const TruthValue& linkTV = a->getTV(*it);
-        double weight = linkTV.getConfidence()*linkTV.getMean();
+        double weight = linkTV.get_confidence()*linkTV.get_mean();
         for (HandleSeq::iterator it2=nodes.begin();it2<nodes.end(); ++it2) {
             if (*it2==h) continue;
             const std::vector<double>& embedding =
@@ -451,16 +479,16 @@ std::vector<double> DimEmbedModule::addNode(Handle h,
 void DimEmbedModule::removeNode(Handle h,
                                 Type linkType)
 {
-    if (!classserver().isLink(linkType))
+    if (!nameserver().isLink(linkType))
         throw InvalidParamException(TRACE_INFO,
             "DimensionalEmbedding requires link type, not %s",
-            classserver().getTypeName(linkType).c_str());
+            nameserver().getTypeName(linkType).c_str());
     if (!isEmbedded(linkType)) {
-        const char* tName = classserver().getTypeName(linkType).c_str();
+        const char* tName = nameserver().getTypeName(linkType).c_str();
         logger().error("No embedding exists for type %s", tName);
         throw std::string("No embedding exists for type %s", tName);
     }
-    bool symmetric = classserver().isA(linkType,UNORDERED_LINK);
+    bool symmetric = nameserver().isA(linkType,UNORDERED_LINK);
     if (symmetric) {
         EmbedTreeMap::iterator treeMapIt = embedTreeMap.find(linkType);
         OC_ASSERT(treeMapIt!=embedTreeMap.end());
@@ -485,16 +513,16 @@ void DimEmbedModule::removeNode(Handle h,
 void DimEmbedModule::addLink(Handle h,
                              Type linkType)
 {
-    if (!classserver().isLink(linkType))
+    if (!nameserver().isLink(linkType))
         throw InvalidParamException(TRACE_INFO,
             "DimensionalEmbedding requires link type, not %s",
-            classserver().getTypeName(linkType).c_str());
+            nameserver().getTypeName(linkType).c_str());
     if (!isEmbedded(linkType)) {
-        const char* tName = classserver().getTypeName(linkType).c_str();
+        const char* tName = nameserver().getTypeName(linkType).c_str();
         logger().error("No embedding exists for type %s", tName);
         throw std::string("No embedding exists for type %s", tName);
     }
-    bool symmetric = classserver().isA(linkType, UNORDERED_LINK);
+    bool symmetric = nameserver().isA(linkType, UNORDERED_LINK);
     if (symmetric) symAddLink(h, linkType);
     else asymAddLink(h, linkType);
 }
@@ -507,7 +535,7 @@ void DimEmbedModule::symAddLink(Handle h, Type linkType)
     int dim = dimensionMap[linkType];
     AtomEmbedding& aE = atomMaps[linkType];
     TruthValuePtr linkTV = h->getTruthValue();
-    double weight = linkTV->getConfidence() * linkTV->getMean();
+    double weight = linkTV->get_confidence() * linkTV->get_mean();
     HandleSeq nodes;
     if (LinkCast(h)) nodes = LinkCast(h)->getOutgoingSet();
     for (HandleSeq::iterator it=nodes.begin();it!=nodes.end();++it) {
@@ -539,7 +567,7 @@ void DimEmbedModule::asymAddLink(Handle h, Type linkType)
     AtomEmbedding& aEForw = asymAtomMaps[linkType].first;
     AtomEmbedding& aEBackw = asymAtomMaps[linkType].second;
     TruthValuePtr linkTV = h->getTruthValue();
-    double weight = linkTV->getConfidence() * linkTV->getMean();
+    double weight = linkTV->get_confidence() * linkTV->get_mean();
     HandleSeq nodes;
     if (LinkCast(h)) nodes = LinkCast(h)->getOutgoingSet();
     Handle source = nodes.front();
@@ -577,15 +605,15 @@ void DimEmbedModule::asymAddLink(Handle h, Type linkType)
 
 void DimEmbedModule::clearEmbedding(Type linkType)
 {
-    if (!classserver().isLink(linkType))
+    if (!nameserver().isLink(linkType))
         throw InvalidParamException(TRACE_INFO,
             "DimensionalEmbedding requires link type, not %s",
-            classserver().getTypeName(linkType).c_str());
-    bool symmetric = classserver().isA(linkType,UNORDERED_LINK);
+            nameserver().getTypeName(linkType).c_str());
+    bool symmetric = nameserver().isA(linkType,UNORDERED_LINK);
 
     HandleSeq pivots  = pivotsMap[linkType];
     for (HandleSeq::iterator it = pivots.begin(); it!=pivots.end(); ++it) {
-        if (as->isValidHandle(*it)) as->decVLTI(*it);
+        if (as->is_valid_handle(*it)) _bank->dec_vlti(*it);
     }
     if (symmetric) {
         atomMaps.erase(linkType);
@@ -600,7 +628,7 @@ void DimEmbedModule::clearEmbedding(Type linkType)
 
 void DimEmbedModule::logAtomEmbedding(Type linkType)
 {
-    bool symmetric = classserver().isA(linkType,UNORDERED_LINK);
+    bool symmetric = nameserver().isA(linkType,UNORDERED_LINK);
     AtomEmbedding atomEmbedding;
     if (symmetric) atomEmbedding=atomMaps[linkType];
     else atomEmbedding=asymAtomMaps[linkType].first;
@@ -610,8 +638,8 @@ void DimEmbedModule::logAtomEmbedding(Type linkType)
 
     oss << "PIVOTS:" << std::endl;
     for (HandleSeq::const_iterator it=pivots.begin(); it!=pivots.end(); ++it){
-        if (as->isValidHandle(*it)) {
-            oss << as->atomAsString(*it,true) << std::endl;
+        if (as->is_valid_handle(*it)) {
+            oss << (*it)->to_short_string() << std::endl;
         } else {
             oss << "[PIVOT'S BEEN DELETED]" << std::endl;
         }
@@ -619,8 +647,8 @@ void DimEmbedModule::logAtomEmbedding(Type linkType)
     oss << "Node Embeddings:" << std::endl;
     AtomEmbedding::const_iterator it;
     for (it=atomEmbedding.begin(); it!=atomEmbedding.end(); ++it){
-        if (as->isValidHandle(it->first)) {
-            oss << as->atomAsString(it->first,true) << " : (";
+        if (as->is_valid_handle(it->first)) {
+            oss << (it->first)->to_short_string() << " : (";
         } else {
             oss << "[NODE'S BEEN DELETED H=" << it->first << "] : (";
         }
@@ -642,15 +670,15 @@ void DimEmbedModule::printEmbedding()
     AtomEmbedMap::const_iterator mit = atomMaps.begin();
     oss << "Node Embeddings" << std::endl;
     for (; mit != atomMaps.end(); ++mit) {
-        oss << "=== for type" << classserver().getTypeName(mit->first).c_str() << std::endl;
+        oss << "=== for type" << nameserver().getTypeName(mit->first).c_str() << std::endl;
         AtomEmbedding atomEmbedding=mit->second;
         AtomEmbedding::const_iterator it;
         for (it=atomEmbedding.begin(); it!=atomEmbedding.end(); ++it){
-            if (as->isValidHandle(it->first)) {
-                oss << as->atomAsString(it->first,true) << " : (";
+            if (as->is_valid_handle(it->first)) {
+                oss << (it->first)->to_short_string() << " : (";
             } else {
                 oss << "[NODE'S BEEN DELETED. handle=";
-                oss << it->first << "] : (";
+                oss << it->first.value() << "] : (";
             }
             const std::vector<double>& embedVector = it->second;
             for (std::vector<double>::const_iterator it2=embedVector.begin();
@@ -666,10 +694,10 @@ void DimEmbedModule::printEmbedding()
 
 bool DimEmbedModule::isEmbedded(Type linkType) const
 {
-    if (!classserver().isLink(linkType))
+    if (!nameserver().isLink(linkType))
         throw InvalidParamException(TRACE_INFO,
             "DimensionalEmbedding requires link type, not %s",
-            classserver().getTypeName(linkType).c_str());
+            nameserver().getTypeName(linkType).c_str());
     //See if atomMaps holds an embedding for linkType
     AtomEmbedMap::const_iterator aEMit = atomMaps.find(linkType);
     if (aEMit!=atomMaps.end()) return true;
@@ -681,7 +709,7 @@ bool DimEmbedModule::isEmbedded(Type linkType) const
 ClusterSeq DimEmbedModule::kMeansCluster(Type l, int numClusters, int npass, bool pivotWise)
 {
     if (!isEmbedded(l)) {
-        const char* tName = classserver().getTypeName(l).c_str();
+        const char* tName = nameserver().getTypeName(l).c_str();
         logger().error("No embedding exists for type %s", tName);
         throw std::string("No embedding exists for type %s", tName);
     }
@@ -774,7 +802,7 @@ ClusterSeq DimEmbedModule::kMeansCluster(Type l, int numClusters, int npass, boo
         clusters[i].second=centroid;
     }
 
-    //for (std::vector<HandleSeq>::const_iterator it=clusters.begin();
+    //for (HandleSeqSeq::const_iterator it=clusters.begin();
     //    it!=clusters.end(); ++it) {
     //    std::cout << "Homogeneity: " << homogeneity(*it,l) << std::endl;
     //    std::cout << "Separation: " << separation(*it,l) << std::endl;
@@ -840,7 +868,7 @@ void DimEmbedModule::addKMeansClusters(Type l, int maxClusters,
     for (pQueue_t::iterator it = clusters.begin();it!=clusters.end();++it) {
         const HandleSeq& cluster = it->second.first;
         const std::vector<double>& centroid = it->second.second;
-        Handle newNode = addPrefixedNode(*as, CONCEPT_NODE, "cluster_");
+        Handle newNode = add_prefixed_node(*as, CONCEPT_NODE, "cluster_");
         std::vector<double> strNumer(0,numDims);
         std::vector<double> strDenom(0,numDims);
         //Connect newNode to each handle in its cluster and each pivot
@@ -850,10 +878,9 @@ void DimEmbedModule::addKMeansClusters(Type l, int maxClusters,
             double dist = euclidDist(centroid,embedVec);
             //TODO: we should do some normalizing of this probably...
             double strength = sqrt(std::pow(2.0, -dist));
-            TruthValuePtr tv(SimpleTruthValue::createTV(strength,
-                                SimpleTruthValue::confidenceToCount(strength)));
-            Handle hi = as->addLink(INHERITANCE_LINK, *it2, newNode);
-            hi->merge(tv);
+            TruthValuePtr tv(SimpleTruthValue::createTV(strength, strength));
+            Handle hi = as->add_link(INHERITANCE_LINK, *it2, newNode);
+            hi->setTruthValue(hi->getTruthValue()->merge(tv));
 
             for (int i=0; i<numDims; ++i) {
                 strNumer[i] += strength * embedVec[i];
@@ -864,10 +891,9 @@ void DimEmbedModule::addKMeansClusters(Type l, int maxClusters,
             //the link between a clusterNode and an attribute (pivot) is
             //a weighted average of the cluster's members' links to the pivot
             double attrStrength = sqrt(strNumer[i]/strDenom[i]);
-            TruthValuePtr tv(SimpleTruthValue::createTV(attrStrength,
-                                SimpleTruthValue::confidenceToCount(attrStrength)));
-            Handle hi = as->addLink(l, newNode, pivots[i]);
-            hi->merge(tv);
+            TruthValuePtr tv(SimpleTruthValue::createTV(attrStrength, attrStrength));
+            Handle hi = as->add_link(l, newNode, pivots[i]);
+            hi->setTruthValue(hi->getTruthValue()->merge(tv));
         }
     }
 }
@@ -875,10 +901,10 @@ void DimEmbedModule::addKMeansClusters(Type l, int maxClusters,
 double DimEmbedModule::homogeneity(const HandleSeq& cluster,
                                    Type linkType) const
 {
-    if (!classserver().isLink(linkType))
+    if (!nameserver().isLink(linkType))
         throw InvalidParamException(TRACE_INFO,
             "DimensionalEmbedding requires link type, not %s",
-            classserver().getTypeName(linkType).c_str());
+            nameserver().getTypeName(linkType).c_str());
     OC_ASSERT(cluster.size()>1);
 
     double average=0;
@@ -901,10 +927,10 @@ double DimEmbedModule::homogeneity(const HandleSeq& cluster,
 double DimEmbedModule::separation(const HandleSeq& cluster,
                                   Type linkType) const
 {
-    if (!classserver().isLink(linkType))
+    if (!nameserver().isLink(linkType))
         throw InvalidParamException(TRACE_INFO,
             "DimensionalEmbedding requires link type, not %s",
-            classserver().getTypeName(linkType).c_str());
+            nameserver().getTypeName(linkType).c_str());
 
     const AtomEmbedding& aE = (atomMaps.find(linkType))->second;
     double minDist=DBL_MAX;
@@ -935,15 +961,15 @@ double DimEmbedModule::separation(const HandleSeq& cluster,
 Handle DimEmbedModule::blendNodes(Handle n1,
                                   Handle n2, Type l)
 {
-    if (!classserver().isLink(l))
+    if (!nameserver().isLink(l))
         throw InvalidParamException(TRACE_INFO,
             "DimensionalEmbedding requires link type, not %s",
-            classserver().getTypeName(l).c_str());
-    if (!as->isNode(n1) || !as->isNode(n2))
+            nameserver().getTypeName(l).c_str());
+    if (!n1->is_node() || !n2->is_node())
         throw InvalidParamException(TRACE_INFO,
                                     "blendNodes requires two nodes.");
     if (!isEmbedded(l)) {
-        const char* tName = classserver().getTypeName(l).c_str();
+        const char* tName = nameserver().getTypeName(l).c_str();
         logger().error("No embedding exists for type %s", tName);
         throw std::string("No embedding exists for type %s", tName);
     }
@@ -965,19 +991,18 @@ Handle DimEmbedModule::blendNodes(Handle n1,
         CoverTreePoint p1(Handle::UNDEFINED,newVec);
         newVec[i]=embedVec2[i];
         CoverTreePoint p2(Handle::UNDEFINED,newVec);
-        double dist1 = p1.distance(cTree.kNearestNeighbors(p1,1)[0]);
-        double dist2 = p2.distance(cTree.kNearestNeighbors(p2,1)[0]);
+        double dist1 = p1.distance(cTree.k_nearest_neighbors(p1,1)[0]);
+        double dist2 = p2.distance(cTree.k_nearest_neighbors(p2,1)[0]);
         if (dist1>dist2) newVec[i]=embedVec2[i];
     }
-    std::string prefix("blend_"+as->getName(n1)+"_"+as->getName(n2)+"_");
-    Handle newNode = addPrefixedNode(*as, n1->getType(), prefix);
+    std::string prefix("blend_"+n1->to_string()+"_"+n2->to_string()+"_");
+    Handle newNode = add_prefixed_node(*as, n1->get_type(), prefix);
 
     for (unsigned int i=0; i<numDims; i++) {
         double strength = sqrt(newVec[i]);
-        TruthValuePtr tv(SimpleTruthValue::createTV(strength,
-                            SimpleTruthValue::confidenceToCount(strength)));
-        Handle hi = as->addLink(l, newNode, pivots[i]);
-        hi->merge(tv);
+        TruthValuePtr tv(SimpleTruthValue::createTV(strength, strength));
+        Handle hi = as->add_link(l, newNode, pivots[i]);
+        hi->setTruthValue(hi->getTruthValue()->merge(tv));
     }
     return newNode;
 }
@@ -997,10 +1022,10 @@ double DimEmbedModule::euclidDist(Handle h1,
                                   Type l,
                                   bool fanin)
 {
-    if (!classserver().isLink(l))
+    if (!nameserver().isLink(l))
         throw InvalidParamException(TRACE_INFO,
             "DimensionalEmbedding requires link type, not %s",
-            classserver().getTypeName(l).c_str());
+            nameserver().getTypeName(l).c_str());
     return euclidDist(getEmbedVector(h1, l, fanin),
                       getEmbedVector(h2, l, fanin));
 }
@@ -1036,11 +1061,11 @@ void DimEmbedModule::handleAddSignal(Handle h)
     else {//h is a link
         for (it = atomMaps.begin(); it != atomMaps.end(); ++it) {
             //if the new link is a subtype of an existing embedding, add it
-            if (classserver().isA(h->getType(), it->first))
+            if (nameserver().isA(h->get_type(), it->first))
                 addLink(h, it->first);
         }
         for (it2 = asymAtomMaps.begin(); it2 !=asymAtomMaps.end(); ++it2) {
-            if (classserver().isA(h->getType(), it2->first))
+            if (nameserver().isA(h->get_type(), it2->first))
                 addLink(h, it2->first);
         }
     }
@@ -1048,7 +1073,7 @@ void DimEmbedModule::handleAddSignal(Handle h)
 
 void DimEmbedModule::atomRemoveSignal(AtomPtr atom)
 {
-    Handle h = atom->getHandle();
+    Handle h = atom->get_handle();
     if (NodeCast(atom)) {
         //for each link type embedding that exists, remove the node
         AtomEmbedMap::iterator it;

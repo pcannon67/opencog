@@ -22,17 +22,18 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <opencog/guile/SchemeEval.h>
-#include <opencog/guile/SchemeSmob.h>
-#include <opencog/server/CogServer.h>
 #include <opencog/util/Config.h>
 #include <opencog/util/Logger.h>
+#include <opencog/guile/SchemeEval.h>
+#include <opencog/guile/SchemeSmob.h>
+#include <opencog/atomspace/AtomSpace.h>
 
 using namespace opencog;
 
 class MicroplanningUTest :  public CxxTest::TestSuite
 {
 private:
+    AtomSpace* _as;
     SchemeEval* _evaluator;
 
 public:
@@ -45,18 +46,39 @@ public:
         }
         catch (RuntimeException &e)
         {
-            std::cerr << e.getMessage() << std::endl;
+            std::cerr << e.get_message() << std::endl;
         }
-        logger().setFilename(config()["LOG_FILE"]);
-        logger().setLevel(Logger::getLevelFromString(config()["LOG_LEVEL"]));
-        logger().setPrintToStdoutFlag(config().get_bool("LOG_TO_STDOUT"));
+        logger().set_timestamp_flag(false);
+        _as = new AtomSpace();
+        _evaluator = new SchemeEval(_as);
+
+        // need this for loading LG dictionary
+        _evaluator->eval("(setlocale LC_CTYPE \"\")");
+        _evaluator->clear_pending();
+
+
+        std::string rv;
+        rv = _evaluator->eval("(use-modules (opencog))");
+        printf("setup opencog=%s", rv.c_str());
+        rv = _evaluator->eval("(use-modules (opencog nlp))");
+        printf("setup nlp=%s", rv.c_str());
+        rv = _evaluator->eval("(use-modules (opencog nlp lg-dict))");
+        printf("setup lg-dict=%s", rv.c_str());
+        rv = _evaluator->eval("(use-modules (opencog spacetime))");
+        printf("setup spacetime=%s", rv.c_str());
+        rv = _evaluator->eval("(use-modules (opencog nlp relex2logic))");
+        printf("setup r2l=%s", rv.c_str());
+        rv = _evaluator->eval("(use-modules (opencog nlp sureal))");
+        printf("setup sureal=%s", rv.c_str());
+        rv = _evaluator->eval("(use-modules (opencog nlp microplanning))");
+        printf("setup micropanning=%s", rv.c_str());
     }
 
     ~MicroplanningUTest()
     {
         // erase the log file if no assertions failed
         if (!CxxTest::TestTracker::tracker().suiteFailed())
-            std::remove(logger().getFilename().c_str());
+            std::remove(logger().get_filename().c_str());
     }
 
     void setUp(void);
@@ -68,57 +90,43 @@ public:
 
 void MicroplanningUTest::setUp(void)
 {
-    server(CogServer::createInstance);
-    _evaluator = new SchemeEval(&cogserver().getAtomSpace());
-
-    // need this for loading LG dictionary
-    _evaluator->eval("(setlocale LC_CTYPE \"\")");
-    _evaluator->clear_pending();
-
-    // Load the required data
-    config().set("MODULES",
-                 "opencog/nlp/types/libnlp-types.so,"
-                 "opencog/nlp/lg-dict/libLGDictModule.so,"
-                 "opencog/nlp/sureal/libSuRealModule.so,"
-                 // need embodiment-types for SequentialAndLink...
-                 "opencog/embodiment/AtomSpaceExtensions/libembodiment-types.so");
-
-    config().set("SCM_PRELOAD",
-                 "opencog/atomspace/core_types.scm,"
-                 "opencog/scm/utilities.scm,"
-                 "opencog/embodiment/AtomSpaceExtensions/embodiment_types.scm,"
-                 "opencog/nlp/types/nlp_types.scm,"
-                 "opencog/nlp/scm/nlp-utils.scm,"
-                 "opencog/nlp/relex2logic/utilities.scm,"
-                 "opencog/nlp/sureal/surface-realization.scm,"
-                 "opencog/nlp/microplanning/main.scm,"
-                 "tests/nlp/microplanning/r2l-atomspace.scm,"
-                 "tests/nlp/microplanning/test-atomspace.scm,"
-                 "tests/nlp/microplanning/test-results.scm");
-
-    cogserver().loadModules();
-    cogserver().loadSCMModules();
+    _evaluator->eval("(load  \"" PROJECT_SOURCE_DIR
+                 "/tests/nlp/microplanning/r2l-atomspace.scm\")");
+    _evaluator->eval("(load  \"" PROJECT_SOURCE_DIR
+                 "/tests/nlp/microplanning/test-atomspace.scm\")");
+    _evaluator->eval("(load  \"" PROJECT_SOURCE_DIR
+                 "/tests/nlp/microplanning/test-results.scm\")");
 }
 
 void MicroplanningUTest::tearDown(void)
 {
-    delete _evaluator;
-    _evaluator = NULL;
+    _as->clear();
 }
 
 void MicroplanningUTest::test_declarative(void)
 {
     logger().debug("BEGIN TEST: %s", __FUNCTION__);
 
-    _evaluator->eval("(define m-result (microplanning test-declarative-sal \"declarative\" *default_chunks_option* #f))");
+    std::string mdef = _evaluator->eval(
+        "(define m-result (microplanning test-declarative-sal \"declarative\" *default_chunks_option* #f))");
+    printf("test_declarative default m-result=%s\n", mdef.c_str());
     bool eval_err = _evaluator->eval_error();
     _evaluator->clear_pending();
     TSM_ASSERT("Failed to run microplanning without anaphora!", !eval_err);
 
-    std::string result = _evaluator->eval("(equal? m-result (declarative-without-anaphora))");
-    TSM_ASSERT("Failed to generate the correct result without anaphora!", result == "#t\n");
+    std::string got = _evaluator->eval("m-result");
+    std::string exp = _evaluator->eval("(declarative-without-anaphora)");
+    printf("got=%s expected=%s\n", got.c_str(), exp.c_str());
 
-    _evaluator->eval("(define m-result (microplanning test-declarative-sal \"declarative\"))");
+    std::string result = _evaluator->eval(
+        "(equal? m-result (declarative-without-anaphora))");
+    printf("equality result=%s\n", result.c_str());
+    TSM_ASSERT("Failed to generate the correct result without anaphora!",
+        result == "#t\n");
+
+    std::string mres = _evaluator->eval(
+        "(define m-result (microplanning test-declarative-sal \"declarative\"))");
+    printf("test_declarative m-result=%s\n", mres.c_str());
     eval_err = _evaluator->eval_error();
     _evaluator->clear_pending();
     TSM_ASSERT("Failed to run microplanning with anaphora!", !eval_err);

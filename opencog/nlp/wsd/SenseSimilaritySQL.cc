@@ -19,7 +19,7 @@
 #include <math.h>
 
 #include <opencog/atomspace/AtomSpace.h>
-#include <opencog/atomspace/Node.h>
+#include <opencog/atoms/base/Node.h>
 #include <opencog/atomspace/SimpleTruthValue.h>
 #include <opencog/persist/sql/odbcxx.h>
 #include <opencog/nlp/wsd/ForeachWord.h>
@@ -130,8 +130,8 @@ SenseSimilaritySQL::~SenseSimilaritySQL()
 SimpleTruthValuePtr SenseSimilaritySQL::similarity(const Handle& first_sense,
         const Handle& second_sense)
 {
-	std::string fk = as->getName(first_sense);
-	std::string sk = as->getName(second_sense);
+	std::string fk = as->get_name(first_sense);
+	std::string sk = as->get_name(second_sense);
 
 	escape_single_quotes(fk);
 	escape_single_quotes(sk);

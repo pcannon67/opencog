@@ -30,8 +30,8 @@ def find_subclasses(module, clazz):
 import imp
 import traceback
 import opencog.cogserver
-from opencog.atomspace cimport cAtomSpace, AtomSpace_factory, AtomSpace
 from opencog.cogserver cimport cAgent, stim_t, cRequest
+from opencog.atomspace cimport cAtomSpace, AtomSpace_factory
 
 cdef extern from "agent_finder_types.h" namespace "opencog":
     cdef struct requests_and_agents_t:
@@ -180,4 +180,3 @@ cdef api string run_request(object o, cpplist[string] args, cAtomSpace *c_atomsp
         s = traceback.format_exc(10)
         result = string(s)
     return result
-    

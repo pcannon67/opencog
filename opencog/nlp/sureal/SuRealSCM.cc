@@ -22,19 +22,22 @@
  */
 
 #include <opencog/util/Logger.h>
-#include <opencog/atomutils/AtomUtils.h>
 #include <opencog/atomutils/FindUtils.h>
-#include <opencog/atoms/bind/PatternUtils.h>
-#include <opencog/atoms/bind/SatisfactionLink.h>
+#include <opencog/atomutils/Neighbors.h>
+#include <opencog/atoms/pattern/PatternUtils.h>
+#include <opencog/atoms/pattern/PatternLink.h>
 #include <opencog/guile/SchemePrimitive.h>
 #include <opencog/nlp/types/atom_types.h>
 
 #include "SuRealSCM.h"
 #include "SuRealPMCB.h"
+#include "SuRealCache.h"
 
 
 using namespace opencog::nlp;
 using namespace opencog;
+
+using namespace std;
 
 
 /**
@@ -80,13 +83,60 @@ void SuRealSCM::init_in_module(void* data)
 void SuRealSCM::init()
 {
 #ifdef HAVE_GUILE
-    define_scheme_primitive("sureal-match", &SuRealSCM::do_sureal_match, this, "nlp sureal");
+    define_scheme_primitive("sureal-match", &SuRealSCM::do_non_cached_sureal_match, this, "nlp sureal");
+    define_scheme_primitive("cached-sureal-match", &SuRealSCM::do_cached_sureal_match, this, "nlp sureal");
+    define_scheme_primitive("reset-cache", &SuRealSCM::reset_cache, this, "nlp sureal");
 #endif
+}
+
+
+/**
+ * Get all the nodes within a link and its sublinks.
+ *
+ * @param h     the top level link
+ * @return      a HandleSeq of nodes
+ */
+static void get_all_unique_nodes(const Handle& h,
+                                 UnorderedHandleSet& node_set)
+{
+   if (h->is_node())
+   {
+      node_set.insert(h);
+      return;
+   }
+
+   for (const Handle& o : h->getOutgoingSet())
+      get_all_unique_nodes(o, node_set);
+}
+
+/**
+ * Implement the "reset-sureal-cache" scheme primitive.
+ *
+ */
+void SuRealSCM::reset_cache(void)
+{
+    SuRealCache::instance().reset();
+}
+
+/**
+ * Implement the "cached-sureal-match" scheme primitive.
+ *
+ */
+HandleSeqSeq SuRealSCM::do_cached_sureal_match(Handle h)
+{
+    return do_sureal_match(h, true);
 }
 
 /**
  * Implement the "sureal-match" scheme primitive.
  *
+ */
+HandleSeqSeq SuRealSCM::do_non_cached_sureal_match(Handle h)
+{
+    return do_sureal_match(h, false);
+}
+
+/**
  * Uses the pattern matcher to find all InterpretationNodes whoses
  * corresponding SetLink contains a structure similar to the input,
  * taking into accounting each ConceptNode/PredicateNode's corresponding
@@ -97,28 +147,29 @@ void SuRealSCM::init()
  * @return    a list of the form returned by sureal_get_mapping, but spanning
  *            multiple InterpretationNode
  */
-HandleSeqSeq SuRealSCM::do_sureal_match(Handle h)
+HandleSeqSeq SuRealSCM::do_sureal_match(Handle h, bool use_cache)
 {
 #ifdef HAVE_GUILE
     // only accept SetLink
-    if (h->getType() != SET_LINK)
+    if (h->get_type() != SET_LINK)
         return HandleSeqSeq();
 
     AtomSpace* pAS = SchemeSmob::ss_get_env_as("sureal-match");
 
-    std::set<Handle> sVars;
+    HandleSet sVars;
 
     // Extract the graph under the SetLink; this is done so that the content
     // of the SetLink could be matched to another SetLink with differnet arity.
     // It is possible to keep the clauses in a SetLink and override the PM's
     // link_match() callback to skip SetLink's arity check , but that would
     // be assuming R2L will never use SetLink for other purposes.
-    HandleSeq qClauses = pAS->getOutgoing(h);
+    const HandleSeq& qClauses = h->getOutgoingSet();
 
     // get all the nodes to be treated as variable in the Pattern Matcher
     // XXX perhaps it's better to write a eval_q in SchemeEval to convert
     //     a scm list to HandleSeq, so can just use the scheme utilities?
-    UnorderedHandleSet allNodes = getAllUniqueNodes(h);
+    UnorderedHandleSet allNodes;
+    get_all_unique_nodes(h, allNodes);
 
     // isolate which nodes are actually words, and which are not; all words
     // need to become variable for the Pattern Matcher
@@ -128,132 +179,75 @@ HandleSeqSeq SuRealSCM::do_sureal_match(Handle h)
         // them as variables;  this is because we have
         //    (InterpreationNode "MicroplanningNewSentence")
         // from the microplanner that should be matched to any InterpretationNode
-        if (n->getType() == INTERPRETATION_NODE || n->getType() == VARIABLE_NODE)
+        if (n->get_type() == INTERPRETATION_NODE || n->get_type() == VARIABLE_NODE)
         {
             sVars.insert(n);
             continue;
         }
 
-        std::string sName = pAS->getName(n);
+        // special treatment for DefinedLinguisticConceptNode and
+        // DefinedLinguisticPredicateNode, do not treat them as variables
+        // because they are not actual words of a sentence.
+        if (n->get_type() == DEFINED_LINGUISTIC_CONCEPT_NODE or
+            n->get_type() == DEFINED_LINGUISTIC_PREDICATE_NODE)
+           continue;
+
+        std::string sName = n->get_name();
+
+        // if it is an instance, check if it has the LG relationships
+        if (sName.find("@") != std::string::npos)
+        {
+            Handle hWordInstNode = pAS->get_handle(WORD_INSTANCE_NODE, sName);
+
+            // no corresponding WordInstanceNode found
+            if (hWordInstNode == Handle::UNDEFINED)
+                continue;
+
+            // if no LG link generated for the instance
+            if (get_target_neighbors(hWordInstNode, LG_WORD_CSET).empty())
+                continue;
+        }
+
         std::string sWord = sName.substr(0, sName.find_first_of('@'));
-        Handle hWordNode = pAS->getHandle(WORD_NODE, sWord);
+        Handle hWordNode = pAS->get_handle(WORD_NODE, sWord);
 
         // no WordNode found
         if (hWordNode == Handle::UNDEFINED)
             continue;
 
-        // if no LG dictionary entry
-        if (getNeighbors(hWordNode, false, true, LG_WORD_CSET, false).empty())
-            continue;
-
         sVars.insert(n);
     }
 
-    // separate the disconnected clauses (this will happen often with SuReal)
-    std::vector<HandleSeq> connectedClauses;
-    std::vector<std::set<Handle>> connectedVars;
-    get_connected_components(sVars, qClauses, connectedClauses, connectedVars);
+    SuRealPMCB pmcb(pAS, sVars, use_cache);
+    PatternLinkPtr slp(createPatternLink(sVars, qClauses));
 
-    logger().debug("[SuReal] Found %d disconnected components", connectedClauses.size());
+    slp->satisfy(pmcb);
 
-    std::map<Handle, std::vector<std::map<Handle, Handle> > > collector;
-
-    // call the pattern matcher on each set of disconnected commponents
-    for (size_t i=0; i<connectedClauses.size(); i++)
-    {
-        logger().debug("[SuReal] starting pattern matcher");
-        const HandleSeq& qClause(connectedClauses[i]);
-        const std::set<Handle>& qVars(connectedVars[i]);
-
-        // I replaced sVars by qVars in the below. sVars had extra
-        // variables that don't appear anywhere in the clauses -- linas.
-        SuRealPMCB pmcb(pAS, qVars);
-        SatisfactionLinkPtr slp(createSatisfactionLink(qVars, qClause));
-        slp->satisfy(pmcb);
-
-        // no pattern matcher result
-        if (pmcb.m_results.empty())
+    // The cached version of SuReal is supposed to return only true or false,
+    // not the set of all acceptable answers. To keep ortogonality with the
+    // interface of the standard (non-cached) version, this shortcut is
+    // returning an empty HandleSeq meaning 'false' or a HandleSeq with a single
+    // (actually meaningless) Handle meaning 'true'.
+    //
+    // Ideally there should be two different methods with different interfaces
+    // for the cached and the non-cached versions.
+    if (use_cache) {
+        if (pmcb.m_results.empty()) {
             return HandleSeqSeq();
-
-        // first disconnected component & result? add it all
-        if (collector.empty())
-        {
-            collector = pmcb.m_results;
-            continue;
+        } else {
+            HandleSeqSeq results;
+            HandleSeq item;
+            Handle h;
+            item.push_back(h);
+            results.push_back(item);
+            return results;
         }
-
-        // if we are checking subsequent disconnected components, we want to
-        // make sure the new results can be merged with results from previously
-        // checked components; ie. only keep those with common
-        // InterpretationNode & no overlapping mappings
-        for (auto it = collector.begin(); it != collector.end(); )
-        {
-            // no common Interpretation, erase the old results as it can no
-            // longer be satisfied
-            if (pmcb.m_results.count(it->first) == 0)
-            {
-                logger().debug("[SuReal] Discarding a result for %s", it->first->toShortString().c_str());
-
-                it = collector.erase(it);
-                continue;
-            }
-
-            auto& existingMaps = it->second;                // a vector of previous mappings
-            auto& appendMaps = pmcb.m_results[it->first];   // a vector of unmerged mappings
-            std::vector<std::map<Handle, Handle> > newMaps;
-
-            // check all combinations of all the old mappings to the new
-            for (auto& em : existingMaps)
-            {
-                for (auto& am: appendMaps)
-                {
-                    // at this point, we know nothing in em & am would map the
-                    // same variable because they are from two disconnected
-                    // clauses.  Instead, we want to check to make sure no two
-                    // variables get mapping to the same node.
-                    auto checker = [&](const std::pair<Handle, Handle>& ekv)
-                    {
-                        return std::any_of(am.begin(), am.end(),
-                                           [&](const std::pair<Handle, Handle>& akv) { return ekv.second == akv.second; });
-                    };
-
-                    if (std::any_of(em.begin(), em.end(), checker))
-                        continue;
-
-                    // clone the old mapping and append the new
-                    std::map<Handle, Handle> newMap(em);
-                    newMap.insert(am.begin(), am.end());
-
-                    // add as one mapping of one InterpretationNode
-                    newMaps.push_back(newMap);
-                }
-            }
-
-            // if none of the mappings can be merged, the interpretation is bad
-            if (newMaps.empty())
-            {
-                logger().debug("[SuReal] Discarding a result for %s", it->first->toShortString().c_str());
-
-                it = collector.erase(it);
-                continue;
-            }
-
-            // replace the old results with the new appended ones
-            it->second = newMaps;
-
-            // go to the next InterpretationNode
-            ++it;
-        }
-
-        // if there's no way to connect the disconnected components
-        if (collector.empty())
-            return HandleSeqSeq();
     }
 
     HandleSeq keys;
 
     // construct the list of InterpretationNode to be returned
-    for (auto& r : collector)
+    for (auto& r : pmcb.m_results)
         keys.push_back(r.first);
 
     // sort the InterpretationNode bases on the size of the corresponding
@@ -262,14 +256,14 @@ HandleSeqSeq SuRealSCM::do_sureal_match(Handle h)
     auto itprComp = [&pAS](const Handle& hi, const Handle& hj)
     {
         // get the corresponding SetLink
-        HandleSeq qi = getNeighbors(hi, false, true, REFERENCE_LINK, false);
-        HandleSeq qj = getNeighbors(hj, false, true, REFERENCE_LINK, false);
-        qi.erase(std::remove_if(qi.begin(), qi.end(), [](Handle& h) { return h->getType() != SET_LINK; }), qi.end());
-        qj.erase(std::remove_if(qj.begin(), qj.end(), [](Handle& h) { return h->getType() != SET_LINK; }), qj.end());
+        HandleSeq qi = get_target_neighbors(hi, REFERENCE_LINK);
+        HandleSeq qj = get_target_neighbors(hj, REFERENCE_LINK);
+        qi.erase(std::remove_if(qi.begin(), qi.end(), [](Handle& h) { return h->get_type() != SET_LINK; }), qi.end());
+        qj.erase(std::remove_if(qj.begin(), qj.end(), [](Handle& h) { return h->get_type() != SET_LINK; }), qj.end());
 
         // assuming each InterpretationNode is only linked to one SetLink
         // and compare using arity
-        return pAS->getArity(qi[0]) < pAS->getArity(qj[0]);
+        return qi[0]->get_arity() < qj[0]->get_arity();
     };
 
     std::sort(keys.begin(), keys.end(), itprComp);
@@ -278,7 +272,7 @@ HandleSeqSeq SuRealSCM::do_sureal_match(Handle h)
 
     for (auto& k : keys)
     {
-        HandleSeqSeq mappings = sureal_get_mapping(k, collector[k]);
+        HandleSeqSeq mappings = sureal_get_mapping(k, pmcb.m_results[k]);
         results.insert(results.end(), mappings.begin(), mappings.end());
     }
 
@@ -314,9 +308,9 @@ HandleSeqSeq SuRealSCM::do_sureal_match(Handle h)
  * @param mappings   the node-to-node mapping
  * @return           a list-of-list of the above structure
  */
-HandleSeqSeq SuRealSCM::sureal_get_mapping(Handle& h, std::vector<std::map<Handle, Handle> >& mappings)
+HandleSeqSeq SuRealSCM::sureal_get_mapping(Handle& h, std::vector<HandleMap >& mappings)
 {
-    logger().debug("[SuReal] %d mapping(s) for %s", mappings.size(), h->toShortString().c_str());
+    logger().debug("[SuReal] %d mapping(s) for %s", mappings.size(), h->to_short_string().c_str());
 
     HandleSeq qKeys, qVars;
 
@@ -333,7 +327,7 @@ HandleSeqSeq SuRealSCM::sureal_get_mapping(Handle& h, std::vector<std::map<Handl
     // if there are more than one mapping, loop thru them
     for (unsigned i = 1; i < mappings.size(); ++i)
     {
-        std::map<Handle, Handle>& mapping = mappings[i];
+        HandleMap& mapping = mappings[i];
 
         qVars.clear();
 

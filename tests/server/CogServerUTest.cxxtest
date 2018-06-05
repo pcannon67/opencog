@@ -25,8 +25,8 @@
 #include <string>
 #include <cstdio>
 
-#include <opencog/server/CogServer.h>
 #include <opencog/util/Config.h>
+#include <opencog/cogserver/server/CogServer.h>
 
 using namespace opencog;
 
@@ -52,13 +52,13 @@ public:
     unsigned int count() { return _count; }
     virtual void run()
     {
-        logger().debug("%ld: executed %s", _cogserver.getCycleCount(), _name.c_str());
+        _log->debug("%ld: executed %s", _cogserver.getCycleCount(), _name.c_str());
         _count++;
 
         // add some nodes to test the SystemActivityTable
         char tmp[100];
         sprintf(tmp, "%s%d", _name.c_str(), _count);
-        Handle h = _cogserver.getAtomSpace().addNode(NODE, tmp);
+        Handle h = _cogserver.getAtomSpace().add_node(NODE, tmp);
         UnorderedHandleSet s;
         s.insert(h);
         _utilizedHandleSets.push_back(s);
@@ -110,14 +110,14 @@ private:
 public:
 
     CogServerUTest() {
-        logger().setLevel(Logger::DEBUG);
-        //logger().setPrintToStdoutFlag(true);
+        logger().set_level(Logger::DEBUG);
+        //logger().set_print_to_stdout_flag(true);
     }
 
     ~CogServerUTest() {
 	    // erase the log file if no assertions failed
 	    if (!CxxTest::TestTracker::tracker().suiteFailed())
-            std::remove(logger().getFilename().c_str());
+            std::remove(logger().get_filename().c_str());
     }
 
     void setUp() {
@@ -153,7 +153,7 @@ public:
         TS_ASSERT(a[4]->count() == 10);
 
         SystemActivityTable &sat = cogserver.systemActivityTable();
-        AgentActivityTable &aat = sat.agentActivityTable();
+        AgentActivityTable aat = sat.agentActivityTable();
         TS_ASSERT(aat[a[0]].size() == 50);
         TS_ASSERT(aat[a[1]].size() == 25);
         TS_ASSERT(aat[a[2]].size() == 16);
@@ -165,7 +165,7 @@ public:
             {
                 Activity *act = aat[a[i]][j];
                 // check nothing takes zero time
-                TS_ASSERT(act->elapsedTime.tv_usec > 0 || act->elapsedTime.tv_sec > 0);
+                TS_ASSERT(act->elapsedTime.count() > 0);
                 // or memory (disabled: current implementation not accurate).
                 //TS_ASSERT(act->memUsed > 0);
                 // or atoms
@@ -180,11 +180,12 @@ public:
         // the sets in the activity tables.
         Activity *firstAct = aat[a[0]][0];
         Handle h = *firstAct->utilizedHandleSets[0].begin();
-        cogserver.getAtomSpace().removeAtom(h);
+        cogserver.getAtomSpace().remove_atom(h);
         TS_ASSERT(firstAct->utilizedHandleSets[0].size() == 0);
 
         // test max size of activity seq
         sat.setMaxAgentActivityTableSeqSize(13);
+        aat = sat.agentActivityTable();
         TS_ASSERT(aat[a[0]].size() == 13);
         TS_ASSERT(aat[a[1]].size() == 13);
         TS_ASSERT(aat[a[2]].size() == 13);
@@ -193,19 +194,24 @@ public:
 
         // Destroy all the agents.
         for (int i = 0; i < 5; ++i) {
-            cogserver.destroyAgent(a[i]);
+            cogserver.stopAgent(a[i]);
         }
 
     } // testProcessAgents
 
     /* test tick-based server */
     void testTickBasedCogServer() {
-        // Make it use external tick so that it does not call sleep inside serverLoop
+        // Make it use external tick so that it does not call
+        // sleep inside serverLoop
+        // Ahem cough cough. The external tick code was
+        // commented out and removed from cogserver maybe 5-10 years
+        // ago.  So this test doesn't do what it claims to do.
         config().set("EXTERNAL_TICK_MODE", "true");
         CustomCogServer cogserver;
         cogserver.setTickBased(true);
-        cogserver.setMaxCount(998);
+        cogserver.setMaxCount(9);
         cogserver.serverLoop();
+        printf("Got %ld ticks\n", cogserver.getCycleCount());
         TS_ASSERT(cogserver.getCycleCount() == 10);
     }
 

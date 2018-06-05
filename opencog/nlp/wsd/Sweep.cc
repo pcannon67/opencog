@@ -101,13 +101,13 @@ bool Sweep::mark_sense(const Handle& sense, const Handle& edge)
 	return false;
 }
  
-void Sweep::delete_edges(std::set<Handle> &edges)
+void Sweep::delete_edges(HandleSet &edges)
 {
 	// Remove all of the senses
-	std::set<Handle>::iterator it;
+	HandleSet::iterator it;
 	for (it=edges.begin(); it != edges.end(); ++it)
 	{
 		Handle edge_h = *it;
-		atom_space->removeAtom(edge_h, false);
+		atom_space->remove_atom(edge_h, false);
 	}
 }

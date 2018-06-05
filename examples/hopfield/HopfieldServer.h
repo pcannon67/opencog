@@ -29,12 +29,12 @@
 
 #include <math.h>
 
-#include <opencog/dynamics/attention/ForgettingAgent.h>
-#include <opencog/dynamics/attention/HebbianUpdatingAgent.h>
-#include <opencog/dynamics/attention/ImportanceSpreadingAgent.h>
-#include <opencog/dynamics/attention/ImportanceUpdatingAgent.h>
-#include <opencog/dynamics/attention/ImportanceDiffusionAgent.h>
-#include <opencog/server/CogServer.h>
+#include <opencog/attention/ForgettingAgent.h>
+#include <opencog/attention/HebbianUpdatingAgent.h>
+#include <opencog/attention/ImportanceSpreadingAgent.h>
+#include <opencog/attention/ImportanceUpdatingAgent.h>
+#include <opencog/attention/ImportanceDiffusionAgent.h>
+#include <opencog/cogserver/server/CogServer.h>
 #include <opencog/util/RandGen.h>
 
 #include "StorkeyAgent.h"
@@ -78,7 +78,7 @@ private:
     void chooseKeyNodes();
     //! get a map of destinations to links from src (when following links
     //! that inherit from linkType.
-    std::map<Handle,Handle> getDestinationsFrom(Handle src, Type linkType);
+    HandleMap getDestinationsFrom(Handle src, Type linkType);
 
 #ifdef HAVE_UBIGRAPH
     //! Ubigrapher for visualising
@@ -88,7 +88,7 @@ private:
     HandleSeq recentlyAddedLinks;
 public:
 
-    static opencog::BaseServer* derivedCreateInstance(void);
+    static opencog::BaseServer* derivedCreateInstance(AtomSpace* as = nullptr);
 
     //! Amount of stimulus to apply across a pattern
     stim_t patternStimulus;
@@ -106,13 +106,13 @@ public:
     float density;
 
     //! Nodes in the Hopfield network can be referenced through HGrid.
-    std::vector<Handle> hGrid;
+    HandleSeq hGrid;
     //! Indication of whether observation nodes in grid are active or key
     //! nodes.
     std::vector<bool> hGridKey;
 
     //! Key nodes for glocal training
-    std::vector<Handle> keyNodes;
+    HandleSeq keyNodes;
 
     HopfieldServer();
     virtual ~HopfieldServer();
@@ -134,11 +134,11 @@ public:
      * @param stimulus amount of stimulus to multiply values in pattern by
      */
     void encodePattern(Pattern pattern, stim_t stimulus);
-    
+
     /** Calculate the total energy of the network.
      *
      * Total energy is calculated from STI values and Hebbian Link weights...
-     * thus the energy is in terms of STI 
+     * thus the energy is in terms of STI
      *
      * @return total energy.
      * @todo implement as an AtomSpace function or AtomTable statistic for total

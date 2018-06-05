@@ -1,5 +1,5 @@
 /*
- * opencog/dynamics/attention/ImprintAgent.cc
+ * opencog/attention/ImprintAgent.cc
  *
  * Copyright (C) 2008 by Singularity Institute for Artificial Intelligence
  * Written by Joel Pitt <joel@fruitionnz.com>
@@ -25,9 +25,9 @@
 #include <iomanip>
 
 #include <opencog/atomspace/AtomSpace.h>
-#include <opencog/atomspace/Link.h>
-#include <opencog/atomspace/SimpleTruthValue.h>
-#include <opencog/server/CogServer.h>
+#include <opencog/atoms/base/Link.h>
+#include <opencog/truthvalue/SimpleTruthValue.h>
+#include <opencog/cogserver/server/CogServer.h>
 #include <opencog/util/Config.h>
 #include <opencog/util/Logger.h>
 
@@ -41,7 +41,7 @@ using namespace opencog;
 
 ImprintAgent::ImprintAgent(CogServer& cs) : Agent(cs), epsilon(Pattern(0,0))
 {
-    static const std::string defaultConfig[] = {
+    static const std::vector<std::string> defaultConfig = {
 //        "ECAN_CONVERT_LINKS","false",
         "",""
     };
@@ -92,6 +92,3 @@ void ImprintAgent::run()
         stimulateAtom( hs->hGrid[i], stimulusAmount * epsilon[i] );
     }
 }
-
-
-

@@ -70,6 +70,10 @@ For now, most of the results are in r2l-atomspace.scm
 (lg-get-dict-entry (WordNode "?"))
 |#
 
+; For anaphora
+(WordNode "he")
+(WordNode "them")
+
 
 ; =========================
 ; Inputs for microplanning
@@ -134,7 +138,7 @@ For now, most of the results are in r2l-atomspace.scm
 			)
 		)		
 		(EvaluationLink (stv 0.99000001 0.99000001)
-			(PredicateNode "possession" (stv 0.001 0.99000001))
+			(DefinedLinguisticPredicateNode "possession" (stv 0.001 0.99000001))
 			(ListLink (stv 0.99000001 0.99000001)
 		 		(ConceptNode "seeds@474593d7-5a5c-4ceb-9cbb-173ade98cc59" (stv 0.001 0.99000001))
 		 		(ConceptNode "apple@ca552878-32d4-41e3-aaa3-34239ba98f34" (stv 0.001 0.99000001))
@@ -388,6 +392,79 @@ For now, most of the results are in r2l-atomspace.scm
 	(WordNode "grow")
 )
 
+(ReferenceLink (stv 1 0.99999982)
+	(ConceptNode "Bob@fd5fb72f-0d3f-4517-8b20-8147df2ee7d3")
+	(WordInstanceNode "Bob@fd5fb72f-0d3f-4517-8b20-8147df2ee7d3")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(PredicateNode "grabs@50f22d3b-c293-41e7-afdd-b2731d6578ef")
+	(WordInstanceNode "grabs@50f22d3b-c293-41e7-afdd-b2731d6578ef")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(ConceptNode "robot@91c3e125-bca8-42f3-8a48-deea6a29c0de")
+	(WordInstanceNode "robot@91c3e125-bca8-42f3-8a48-deea6a29c0de")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(PredicateNode "steals@d88d647d-5c02-481e-b8d0-cfd20d33fb23")
+	(WordInstanceNode "steals@d88d647d-5c02-481e-b8d0-cfd20d33fb23")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(ConceptNode "apple@ca552878-32d4-41e3-aaa3-34239ba98f34")
+	(WordInstanceNode "apple@ca552878-32d4-41e3-aaa3-34239ba98f34")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(PredicateNode "climbs@cc237a97-1cde-4939-bf7e-93d607eb3d7d")
+	(WordInstanceNode "climbs@cc237a97-1cde-4939-bf7e-93d607eb3d7d")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(ConceptNode "tree@160bc480-942c-4421-b798-04c004c011f5")
+	(WordInstanceNode "tree@160bc480-942c-4421-b798-04c004c011f5")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(ConceptNode "green@7bdd117a-14ab-4699-81e3-f89259d848df")
+	(WordInstanceNode "green@7bdd117a-14ab-4699-81e3-f89259d848df")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(PredicateNode "eats@5ec780eb-a98b-4650-a680-3b0163a8822e")
+	(WordInstanceNode "eats@5ec780eb-a98b-4650-a680-3b0163a8822e")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(PredicateNode "collects@78c90976-cb18-4b09-9169-00bc3cc6a70a")
+	(WordInstanceNode "collects@78c90976-cb18-4b09-9169-00bc3cc6a70a")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(ConceptNode "tiny@ab783d83-a6cb-4be8-9d6d-45b97a1bd955")
+	(WordInstanceNode "tiny@ab783d83-a6cb-4be8-9d6d-45b97a1bd955")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(ConceptNode "seeds@474593d7-5a5c-4ceb-9cbb-173ade98cc59")
+	(WordInstanceNode "seeds@474593d7-5a5c-4ceb-9cbb-173ade98cc59")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(PredicateNode "plants@0f71e243-1327-49af-8020-f6aa3ef0d273")
+	(WordInstanceNode "plants@0f71e243-1327-49af-8020-f6aa3ef0d273")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(ConceptNode "I@5219488c-e6f1-413a-8494-77deeb9f33f3")
+	(WordInstanceNode "I@5219488c-e6f1-413a-8494-77deeb9f33f3")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(PredicateNode "mean@524fdbed-149e-47ce-a2a2-494e80962580")
+	(WordInstanceNode "mean@524fdbed-149e-47ce-a2a2-494e80962580")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(ConceptNode "tall@7bd00625-1ff7-4e77-9900-5e943141d281")
+	(WordInstanceNode "tall@7bd00625-1ff7-4e77-9900-5e943141d281")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(ConceptNode "pine@981c495c-1111-4bb2-8f7f-164a1122cae6")
+	(WordInstanceNode "pine@981c495c-1111-4bb2-8f7f-164a1122cae6")
+)
+(ReferenceLink (stv 1 0.99999982)
+	(PredicateNode "grow@3fe4efed-5135-408f-bc1b-d02343bb69c1")
+	(WordInstanceNode "grow@3fe4efed-5135-408f-bc1b-d02343bb69c1")
+)
+
 (InheritanceLink (stv 1 0.99999982)
 	(WordInstanceNode "apple@ca552878-32d4-41e3-aaa3-34239ba98f34")
 	(DefinedLinguisticConceptNode "definite")
@@ -573,6 +650,222 @@ For now, most of the results are in r2l-atomspace.scm
 	(ConceptNode "tree@160bc480-942c-4421-b798-04c004c011f5" (stv 0.001 0.99000001))
 )
 
+;;;;;;;;;;;;;; Other suppporting LG output ;;;;;;;;;;;;;;;;;;
+(LgWordCset
+   (WordInstanceNode "tall@7bd00625-1ff7-4e77-9900-5e943141d281")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "A")
+         (LgConnDirNode "+")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "mean@524fdbed-149e-47ce-a2a2-494e80962580")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "Sp")
+         (LgConnDirNode "-")
+      )
+      (LgConnector
+         (LgConnectorNode "dWV")
+         (LgConnDirNode "-")
+      )
+      (LgConnector
+         (LgConnectorNode "O")
+         (LgConnDirNode "+")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "I@5219488c-e6f1-413a-8494-77deeb9f33f3")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "Wd")
+         (LgConnDirNode "-")
+      )
+      (LgConnector
+         (LgConnectorNode "Sp*i")
+         (LgConnDirNode "+")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "grow@3fe4efed-5135-408f-bc1b-d02343bb69c1")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "Sp")
+         (LgConnDirNode "-")
+      )
+      (LgConnector
+         (LgConnectorNode "dWV")
+         (LgConnDirNode "-")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "plants@0f71e243-1327-49af-8020-f6aa3ef0d273")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "VJr*i")
+         (LgConnDirNode "-")
+      )
+      (LgConnector
+         (LgConnectorNode "O")
+         (LgConnDirNode "+")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "collects@78c90976-cb18-4b09-9169-00bc3cc6a70a")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "O")
+         (LgConnDirNode "+")
+      )
+      (LgConnector
+         (LgConnectorNode "VJl*i")
+         (LgConnDirNode "+")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "tiny@ab783d83-a6cb-4be8-9d6d-45b97a1bd955")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "A")
+         (LgConnDirNode "+")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "seeds@474593d7-5a5c-4ceb-9cbb-173ade98cc59")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "Dmc")
+         (LgConnDirNode "-")
+      )
+      (LgConnector
+         (LgConnectorNode "Op")
+         (LgConnDirNode "-")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "eats@5ec780eb-a98b-4650-a680-3b0163a8822e")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "VJr*t")
+         (LgConnDirNode "-")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "steals@d88d647d-5c02-481e-b8d0-cfd20d33fb23")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "VJl*t")
+         (LgConnDirNode "+")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "Bob@fd5fb72f-0d3f-4517-8b20-8147df2ee7d3")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "Wd")
+         (LgConnDirNode "-")
+      )
+      (LgConnector
+         (LgConnectorNode "Ss")
+         (LgConnDirNode "+")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "climbs@cc237a97-1cde-4939-bf7e-93d607eb3d7d")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "O")
+         (LgConnDirNode "+")
+      )
+      (LgConnector
+         (LgConnectorNode "VJl*i")
+         (LgConnDirNode "+")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "green@7bdd117a-14ab-4699-81e3-f89259d848df")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "A")
+         (LgConnDirNode "+")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "robot@91c3e125-bca8-42f3-8a48-deea6a29c0de")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "Ds**c")
+         (LgConnDirNode "-")
+      )
+      (LgConnector
+         (LgConnectorNode "Wd")
+         (LgConnDirNode "-")
+      )
+      (LgConnector
+         (LgConnectorNode "Ss")
+         (LgConnDirNode "+")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "apple@ca552878-32d4-41e3-aaa3-34239ba98f34")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "A")
+         (LgConnDirNode "-")
+         (LgConnMultiNode "@")
+      )
+      (LgConnector
+         (LgConnectorNode "Dmu")
+         (LgConnDirNode "-")
+      )
+      (LgConnector
+         (LgConnectorNode "Ou")
+         (LgConnDirNode "-")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "tree@160bc480-942c-4421-b798-04c004c011f5")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "Ds**c")
+         (LgConnDirNode "-")
+      )
+      (LgConnector
+         (LgConnectorNode "Os")
+         (LgConnDirNode "-")
+      )
+   )
+)
+(LgWordCset
+   (WordInstanceNode "grabs@50f22d3b-c293-41e7-afdd-b2731d6578ef")
+   (LgAnd
+      (LgConnector
+         (LgConnectorNode "VJr*i")
+         (LgConnDirNode "-")
+      )
+      (LgConnector
+         (LgConnectorNode "O")
+         (LgConnDirNode "+")
+      )
+   )
+)
+
 
 ;;;;;;;;;;;;;;;;; RelEx2Logic style output ;;;;;;;;;;;;;;;;;;;
 #|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -598,10 +891,10 @@ For now, most of the results are in r2l-atomspace.scm
 )
 (InheritanceLink (stv 0.99000001 0.99000001)
 	(PredicateNode "steals@d88d647d-5c02-481e-b8d0-cfd20d33fb23" (stv 0.001 0.99000001))
-	(ConceptNode "present" (stv 0.001 0.99000001))
+	(DefinedLinguisticConceptNode "present" (stv 0.001 0.99000001))
 )
 (EvaluationLink (stv 0.99000001 0.99000001)
-	(PredicateNode "definite" (stv 0.001 0.99000001))
+	(DefinedLinguisticPredicateNode "definite" (stv 0.001 0.99000001))
 	(ListLink (stv 0.99000001 0.99000001)
 		(ConceptNode "apple@ca552878-32d4-41e3-aaa3-34239ba98f34" (stv 0.001 0.99000001))
 	)
@@ -619,7 +912,7 @@ For now, most of the results are in r2l-atomspace.scm
 	(ConceptNode "person" (stv 0.001 0.99000001))
 )
 (EvaluationLink (stv 0.99000001 0.99000001)
-	(PredicateNode "definite" (stv 0.001 0.99000001))
+	(DefinedLinguisticPredicateNode "definite" (stv 0.001 0.99000001))
 	(ListLink (stv 0.99000001 0.99000001)
 		(ConceptNode "Bob@fd5fb72f-0d3f-4517-8b20-8147df2ee7d3" (stv 0.001 0.99000001))
 	)
@@ -645,10 +938,10 @@ For now, most of the results are in r2l-atomspace.scm
 )
 (InheritanceLink (stv 0.99000001 0.99000001)
 	(PredicateNode "climbs@cc237a97-1cde-4939-bf7e-93d607eb3d7d" (stv 0.001 0.99000001))
-	(ConceptNode "present" (stv 0.001 0.99000001))
+	(DefinedLinguisticConceptNode "present" (stv 0.001 0.99000001))
 )
 (EvaluationLink (stv 0.99000001 0.99000001)
-	(PredicateNode "definite" (stv 0.001 0.99000001))
+	(DefinedLinguisticPredicateNode "definite" (stv 0.001 0.99000001))
 	(ListLink (stv 0.99000001 0.99000001)
 	(ConceptNode "robot@91c3e125-bca8-42f3-8a48-deea6a29c0de" (stv 0.001 0.99000001))
 	)
@@ -674,16 +967,16 @@ For now, most of the results are in r2l-atomspace.scm
 )
 (InheritanceLink (stv 0.99000001 0.99000001)
 	(PredicateNode "grabs@50f22d3b-c293-41e7-afdd-b2731d6578ef" (stv 0.001 0.99000001))
-	(ConceptNode "present" (stv 0.001 0.99000001))
+	(DefinedLinguisticConceptNode "present" (stv 0.001 0.99000001))
 )
 (EvaluationLink (stv 0.99000001 0.99000001)
-	(PredicateNode "definite" (stv 0.001 0.99000001))
+	(DefinedLinguisticPredicateNode "definite" (stv 0.001 0.99000001))
 	(ListLink (stv 0.99000001 0.99000001)
 		(ConceptNode "apple@ca552878-32d4-41e3-aaa3-34239ba98f34" (stv 0.001 0.99000001))
 	)
 )
 (EvaluationLink (stv 0.99000001 0.99000001)
-	(PredicateNode "definite" (stv 0.001 0.99000001))
+	(DefinedLinguisticPredicateNode "definite" (stv 0.001 0.99000001))
 	(ListLink (stv 0.99000001 0.99000001)
 		(ConceptNode "robot@91c3e125-bca8-42f3-8a48-deea6a29c0de" (stv 0.001 0.99000001))
 	)
@@ -702,7 +995,7 @@ For now, most of the results are in r2l-atomspace.scm
 )
 (InheritanceLink (stv 0.99000001 0.99000001)
 	(PredicateNode "eats@5ec780eb-a98b-4650-a680-3b0163a8822e" (stv 0.001 0.99000001))
-	(ConceptNode "present" (stv 0.001 0.99000001))
+	(DefinedLinguisticConceptNode "present" (stv 0.001 0.99000001))
 )
 (ImplicationLink (stv 0.99000001 0.99000001)
 	(PredicateNode "collects@78c90976-cb18-4b09-9169-00bc3cc6a70a" (stv 0.001 0.99000001))
@@ -714,14 +1007,14 @@ For now, most of the results are in r2l-atomspace.scm
 )
 (InheritanceLink (stv 0.99000001 0.99000001)
 	(PredicateNode "collects@78c90976-cb18-4b09-9169-00bc3cc6a70a" (stv 0.001 0.99000001))
-	(ConceptNode "present" (stv 0.001 0.99000001))
+	(DefinedLinguisticConceptNode "present" (stv 0.001 0.99000001))
 )
 (InheritanceLink (stv 0.99000001 0.99000001)
 	(ConceptNode "tiny@ab783d83-a6cb-4be8-9d6d-45b97a1bd955" (stv 0.001 0.99000001))
 	(ConceptNode "tiny" (stv 0.001 0.99000001))
 )
 (EvaluationLink (stv 0.99000001 0.99000001)
-	(PredicateNode "definite" (stv 0.001 0.99000001))
+	(DefinedLinguisticPredicateNode "definite" (stv 0.001 0.99000001))
 	(ListLink (stv 0.99000001 0.99000001)
 		(ConceptNode "seeds@474593d7-5a5c-4ceb-9cbb-173ade98cc59" (stv 0.001 0.99000001))
 	)
@@ -732,7 +1025,7 @@ For now, most of the results are in r2l-atomspace.scm
 )
 (InheritanceLink (stv 0.99000001 0.99000001)
 	(PredicateNode "plants@0f71e243-1327-49af-8020-f6aa3ef0d273" (stv 0.001 0.99000001))
-	(ConceptNode "present" (stv 0.001 0.99000001))
+	(DefinedLinguisticConceptNode "present" (stv 0.001 0.99000001))
 )
 (ImplicationLink (stv 0.99000001 0.99000001)
 	(PredicateNode "mean@524fdbed-149e-47ce-a2a2-494e80962580" (stv 0.001 0.99000001))
@@ -744,10 +1037,10 @@ For now, most of the results are in r2l-atomspace.scm
 )
 (InheritanceLink (stv 0.99000001 0.99000001)
 	(PredicateNode "mean@524fdbed-149e-47ce-a2a2-494e80962580" (stv 0.001 0.99000001))
-	(ConceptNode "present" (stv 0.001 0.99000001))
+	(DefinedLinguisticConceptNode "present" (stv 0.001 0.99000001))
 )
 (EvaluationLink (stv 0.99000001 0.99000001)
-	(PredicateNode "definite" (stv 0.001 0.99000001))
+	(DefinedLinguisticPredicateNode "definite" (stv 0.001 0.99000001))
 	(ListLink (stv 0.99000001 0.99000001)
 		(ConceptNode "I@5219488c-e6f1-413a-8494-77deeb9f33f3" (stv 0.001 0.99000001))
 	)

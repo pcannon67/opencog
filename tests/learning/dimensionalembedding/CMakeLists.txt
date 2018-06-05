@@ -3,8 +3,9 @@ IF (HAVE_GUILE)
 	TARGET_LINK_LIBRARIES(DimEmbedUTest
 		dimensionalembedding
 		server
-		atomspace
+		${ATOMSPACE_LIBRARY}
 		${COGUTIL_LIBRARY}
 		${GUILE_LIBRARIES}
+		${Boost_SYSTEM_LIBRARY}
 	)
 ENDIF (HAVE_GUILE)

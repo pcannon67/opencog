@@ -2,52 +2,35 @@
 # The atom_types.h file is written to the build directory
 INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR})
 
-# The build order used here is loosely in terms of 
+# The build order used here is loosely in terms of
 # dependencies: the later parts depend on, or may
 # someday depend on the earlier parts.
 #
 ADD_SUBDIRECTORY (learning)
-ADD_SUBDIRECTORY (reasoning)
 
 IF (HAVE_ATOMSPACE)
-    ADD_SUBDIRECTORY (atoms)
-    ADD_SUBDIRECTORY (atomspace)
-    ADD_SUBDIRECTORY (atomspaceutils)
-    ADD_SUBDIRECTORY (atomutils)
-    ADD_SUBDIRECTORY (benchmark)
-    ADD_SUBDIRECTORY (query)
-    ADD_SUBDIRECTORY (nlp)
-    ADD_SUBDIRECTORY (persist)
+	ADD_SUBDIRECTORY (nlp)
+	ADD_SUBDIRECTORY (spacetime)
 ENDIF (HAVE_ATOMSPACE)
 
 IF (HAVE_SERVER)
-    ADD_SUBDIRECTORY (dynamics)
-    ADD_SUBDIRECTORY (modules)
-    ADD_SUBDIRECTORY (server)
+	ADD_SUBDIRECTORY (cogserver)
+	# attention builds *after* cogserver.
+	ADD_SUBDIRECTORY (attention)
 ENDIF(HAVE_SERVER)
 
-# Extension language support
 IF (HAVE_ATOMSPACE AND HAVE_GUILE)
-	ADD_SUBDIRECTORY (guile)
 	ADD_SUBDIRECTORY (scm)
-	ADD_SUBDIRECTORY (shell)
+	ADD_SUBDIRECTORY (openpsi)
+	ADD_SUBDIRECTORY (pln)
+	ADD_SUBDIRECTORY (eva)
+	ADD_SUBDIRECTORY (ghost)
 ENDIF (HAVE_ATOMSPACE AND HAVE_GUILE)
 
 IF (HAVE_CYTHON)
 	ADD_SUBDIRECTORY (cython)
+	ADD_SUBDIRECTORY (python)
 ENDIF (HAVE_CYTHON)
-
-IF (HAVE_GHC)
-	ADD_SUBDIRECTORY (haskell)
-ENDIF (HAVE_GHC)
-
-IF (HAVE_SERVER)
-    ADD_SUBDIRECTORY (spacetime)
-    ADD_SUBDIRECTORY (spatial)
-ENDIF (HAVE_SERVER)
-
-# build unconditionally; a check is made there.
-ADD_SUBDIRECTORY (embodiment)
 
 # Graphics and visualization subsystems
 ADD_SUBDIRECTORY (visualization)

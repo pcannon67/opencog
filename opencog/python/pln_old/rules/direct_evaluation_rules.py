@@ -357,10 +357,8 @@ class GeneralEvaluationToMemberRule(Rule):
 
         if arg.type == types.ListLink:
             for i in arg.out:
-                # The arg.out is a list that must not be changed. If arg.out is
-                # used instead of the returned value of atomspace's get_outgoing
-                # method then the changes made to arg.out are permanent.
-                list_arg = self.chainer.atomspace.get_outgoing(arg.h)
+                # Make a copy so we don't change arg.out while iterating.
+                list_arg = arg.out
                 first_iter = True
 
                 for j in variables:
@@ -411,7 +409,7 @@ class GeneralAtTimeEvaluationToMemberRule(Rule):
         all_args = chainer.make_n_variables(arg_count)
         list_link = chainer.link(types.ListLink, all_args)
         eval_link = chainer.link(types.EvaluationLink, [pred, list_link])
-        at_time = chainer.link(types.AtTimeLink, [time, eval_link])
+        at_time = chainer.link(types.AtTimeLink, [eval_link, time])
 
         self.chainer = chainer
         Rule.__init__(self,

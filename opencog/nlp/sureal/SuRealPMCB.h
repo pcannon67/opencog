@@ -25,8 +25,10 @@
 #define _OPENCOG_SUREAL_PMCB_H
 
 
+#include <unordered_map>
 #include <opencog/query/DefaultPatternMatchCB.h>
-#include <opencog/guile/SchemeEval.h>
+#include <opencog/query/InitiateSearchCB.h>
+#include <opencog/atoms/base/Handle.h>
 
 
 namespace opencog
@@ -40,28 +42,48 @@ namespace nlp
  * Override the neccessary callbacks to do special handling of variables
  * and LG dictionary checks.
  */
-class SuRealPMCB : public DefaultPatternMatchCB
+class SuRealPMCB :
+    public InitiateSearchCB,
+    public DefaultPatternMatchCB
 {
 public:
-    SuRealPMCB(AtomSpace* as, const std::set<Handle>& vars);
+    SuRealPMCB(AtomSpace* as, const HandleSet& vars, bool use_cache);
     ~SuRealPMCB();
 
     virtual bool variable_match(const Handle& hPat, const Handle& hSoln);
     virtual bool clause_match(const Handle& pattrn_link_h, const Handle& grnd_link_h);
-    virtual bool grounding(const std::map<Handle, Handle> &var_soln,
-                           const std::map<Handle, Handle> &pred_soln);
-    virtual bool initiate_search(PatternMatchEngine* pPME,
-                                const Variables& vars,
-                                const Pattern& pat);
+    virtual bool grounding(const HandleMap &var_soln,
+                           const HandleMap &pred_soln);
+    virtual bool initiate_search(PatternMatchEngine*);
+    virtual void set_pattern(const Variables& vars,
+                             const Pattern& pat)
+    {
+        InitiateSearchCB::set_pattern(vars, pat);
+        DefaultPatternMatchCB::set_pattern(vars, pat);
+    }
 
-    std::map<Handle, std::vector<std::map<Handle, Handle> > > m_results;   // store the PM results
+    std::map<Handle, HandleMapSeq> m_results;   // store the PM results
 
 private:
-    virtual Handle find_starter(const Handle&, size_t&, Handle&, size_t&);
+    virtual Handle find_starter_recursive(const Handle&, size_t&, Handle&, size_t&);
+    bool disjunct_match(const Handle&, const Handle&);
 
-    std::set<Handle> m_vars;   // store nodes that are variables
+    AtomSpace* m_as;
+    bool m_use_cache;
+    HandleSet m_vars;   // store nodes that are variables
 
-    SchemeEval* m_eval;
+    std::unordered_map<Handle, HandleSeq> m_disjuncts;   // store the disjuncts of nodes in the pattern
+
+    std::unordered_map<Handle, Handle> m_words;   // store the corresponding WordNodes of the nodes in the pattern
+
+    HandleSet m_interp;   // store a set of InterpretationNodes correspond to some clauses accepted in clause_match()
+    HandleSet m_targets;   // store a set of target InterpretationNodes
+
+    struct CandHandle
+    {
+        Handle handle;
+        size_t r2lSetLinkSize;
+    };
 };
 
 }

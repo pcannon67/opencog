@@ -28,10 +28,11 @@
 
 #include <boost/pointer_cast.hpp>
 
+#include <opencog/atoms/proto/NameServer.h>
 #include <opencog/atomspace/AtomSpace.h>
-#include <opencog/atomspace/Link.h>
-#include <opencog/atomspace/Node.h>
-#include <opencog/server/CogServer.h>
+#include <opencog/atoms/base/Link.h>
+#include <opencog/atoms/base/Node.h>
+#include <opencog/cogserver/server/CogServer.h>
 #include <opencog/util/Logger.h>
 
 #include "DottyModule.h"
@@ -61,18 +62,18 @@ public:
             // don't make nodes for binary links with no incoming
             LinkPtr l(LinkCast(a));
             if (l and l->getOutgoingSet().size() == 2 and
-                     space->getIncoming(h).size() == 0)
+                     h->getIncomingSetSize() == 0)
                 return false;
         }
 
         std::ostringstream ost;
         ost << h.value() << " [";
-        if (!classserver().isNode(a->getType()))
+        if (!nameserver().isNode(a->get_type()))
             ost << "shape=\"diamond\" ";
-        ost << "label=\"[" << classserver().getTypeName(a->getType()) << "]";
-        if (classserver().isNode(a->getType())) {
+        ost << "label=\"[" << nameserver().getTypeName(a->get_type()) << "]";
+        if (nameserver().isNode(a->get_type())) {
             NodePtr n(NodeCast(a));
-            ost << " " << n->getName();
+            ost << " " << n->get_name();
         } //else {
             // TODO: anything to output for links?
             //LinkPtr l = boost::dynamic_pointer_cast<Link>(a);
@@ -94,26 +95,29 @@ public:
         LinkPtr l(LinkCast(a));
         if (l)
         {
-            const std::vector<Handle> &out = l->getOutgoingSet();
+            const HandleSeq &out = l->getOutgoingSet();
 
-            if (compact && out.size() == 2 and space->getIncoming(h).size() == 0)
+            if (compact and out.size() == 2 and h->getIncomingSetSize() == 0)
             {
-                ost << out[0] << " -> " << out[1] << " [label=\""
-                    << classserver().getTypeName(a->getType()) << "\"];\n";
+	            ost << out[0].value() << " -> " << out[1].value() << " [label=\""
+                    << nameserver().getTypeName(a->get_type()) << "\"];\n";
                 answer += ost.str();
                 return false;
             }
 
             for (size_t i = 0; i < out.size(); i++) {
-                ost << h << "->" << out[i] << " [label=\"" << i << "\"];\n";
+	            ost << h.value() << "->" << out[i].value()
+	                << " [label=\"" << i << "\"];\n";
             }
         }
 
         if (withIncoming) {
-            HandleSeq hs = space->getIncoming(h);
+            HandleSeq hs;
+            h->getIncomingSet(back_inserter(hs));
             int i = 0;
-            for (Handle h : hs) {
-                ost << h << "->" << h << " [style=\"dotted\" label=\"" << i << "\"];\n";
+            for (const Handle& h : hs) {
+	            ost << h.value() << "->" << h.value()
+	                << " [style=\"dotted\" label=\"" << i << "\"];\n";
                 i++;
             }
         }

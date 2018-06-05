@@ -12,8 +12,8 @@
 #define _OPENCOG_SENSE_CACHE_H
 
 #include <opencog/atomspace/AtomSpace.h>
-#include <opencog/atomspace/Link.h>
-#include <opencog/atomspace/TruthValue.h>
+#include <opencog/atoms/base/Link.h>
+#include <opencog/truthvalue/TruthValue.h>
 
 namespace opencog {
 

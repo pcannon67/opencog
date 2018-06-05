@@ -57,22 +57,22 @@ int main(int argc, char *argv[])
     (static_cast<HopfieldServer&>(server())).init(-1, -1, -1);
 
     /* setup logging */
-    logger().setPrintToStdoutFlag(config().get_bool("LOG_TO_STDOUT"));
+    logger().set_print_to_stdout_flag(config().get_bool("LOG_TO_STDOUT"));
     switch (o->verboseLevel) {
     case 1:
-        logger().setLevel(Logger::INFO);
-        logger().setPrintToStdoutFlag(true);
+        logger().set_level(Logger::INFO);
+        logger().set_print_to_stdout_flag(true);
         break;
     case 2:
-        logger().setLevel(Logger::DEBUG);
-        logger().setPrintToStdoutFlag(true);
+        logger().set_level(Logger::DEBUG);
+        logger().set_print_to_stdout_flag(true);
         break;
     case 3:
-        logger().setLevel(Logger::FINE);
-        logger().setPrintToStdoutFlag(true);
+        logger().set_level(Logger::FINE);
+        logger().set_print_to_stdout_flag(true);
         break;
     default:
-        logger().setLevel(Logger::WARN);
+        logger().set_level(Logger::WARN);
     }
 
     if (o->showConfigFlag) {
@@ -183,14 +183,14 @@ void testHopfieldNetworkPalimpsestNeighbours()
 
             foreach (bool b, stableBit) {
             //    cout << b << " ";
-                if (b) rSim += 1; 
+                if (b) rSim += 1;
             }
             //cout << endl;
             rSim /= stableBit.size();
             //cout << "rSim = " << rSim << endl;
 
             //logger().debug(" Similarity %.2f ( diff: %.2f )", rSim, rSim - patterns[j].hammingSimilarity(cuePatterns[j]));
-            
+
             if ( rSim < 1) {
                 break;
             }
@@ -262,7 +262,7 @@ void testHopfieldNetworkPalimpsest()
             cycleResults.push_back(rSim);
 
             logger().debug(" Similarity %.2f ( diff: %.2f )", rSim, rSim - patterns[j].hammingSimilarity(cuePatterns[j]));
-            
+
             if ( (rSim * 100) < (100 - o->palimpsestTolerance) ) break;
             memory++;
 
@@ -399,4 +399,3 @@ void testHopfieldNetworkRolling()
     }
 
 }
-

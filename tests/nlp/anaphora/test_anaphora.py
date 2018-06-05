@@ -2,18 +2,26 @@ __author__ = 'Hujie'
 
 import unittest
 
-from opencog.atomspace import AtomSpace, TruthValue, Atom, Handle
-from opencog.atomspace import types, is_a, get_type, get_type_name
+from opencog.atomspace import AtomSpace, TruthValue, Atom
+from opencog.atomspace import is_a, get_type, get_type_name
 from opencog.scheme_wrapper import load_scm, scheme_eval, scheme_eval_h, __init__
-from anaphora.agents.hobbs import HobbsAgent
-#from agents.hobbs import HobbsAgent
+from opencog.cogserver_type_constructors import types
+
+# The path is commented out b/c there is no __init__.py in
+# https://github.com/opencog/opencog/tree/master/opencog/nlp don't think it
+# would make sense to add it there as the directory contains code from other
+# languages.
+#from anaphora.agents.hobbs import HobbsAgent
+from agents.hobbs import HobbsAgent
 from unittest import TestCase
 
 
 __VERBOSE__ = False
 
-# Set to True to search for needed .scm files in default IN-SOURCE build location, e.g. to write unit tests in the IDE
-# Set to False to search for needed .scm files based on environment variables PROJECT_SOURCE_DIR and PROJECT_BINARY_DIR
+# Set to True to search for needed .scm files in default IN-SOURCE
+# build location, e.g. to write unit tests in the IDE
+# Set to False to search for needed .scm files based on environment
+# variables PROJECT_SOURCE_DIR and PROJECT_BINARY_DIR
 __DEV_MODE__ = False
 
 class AnaphoraUnitTester(TestCase):
@@ -21,41 +29,21 @@ class AnaphoraUnitTester(TestCase):
     def setUp(self):
 
         self.atomspace= AtomSpace()
-        __init__(self.atomspace)
-        data=["opencog/scm/config.scm",
-              "opencog/atomspace/core_types.scm",
-              "spacetime/spacetime_types.scm",
-              "opencog/nlp/types/nlp_types.scm",
-              "opencog/dynamics/attention/attention_types.scm",
-              "opencog/embodiment/AtomSpaceExtensions/embodiment_types.scm",
-              "opencog/reasoning/pln/pln_types.scm",
-              "opencog/scm/apply.scm",
-              "opencog/scm/file-utils.scm",
-              "opencog/scm/persistence.scm",
-              #"opencog/scm/repl-shell.scm",
-              "opencog/scm/utilities.scm",
-              "opencog/scm/av-tv.scm",
-              "opencog/nlp/scm/type-definitions.scm",
-              "opencog/nlp/scm/config.scm",
-              "opencog/nlp/scm/file-utils.scm",
-              "opencog/nlp/scm/nlp-utils.scm",
-              "opencog/nlp/scm/disjunct-list.scm",
-              "opencog/nlp/scm/processing-utils.scm",
-              ]
 
+        scheme_eval(self.atomspace, "(add-to-load-path \"/usr/local/share/opencog/scm\")")
+        scheme_eval(self.atomspace, "(use-modules (opencog))")
+        scheme_eval(self.atomspace, "(use-modules (opencog query))")
+        scheme_eval(self.atomspace, "(use-modules (opencog nlp))")
 
-        for item in data:
-            status=load_scm(self.atomspace, item)
         self.hobbsAgent=HobbsAgent()
-
 
     def tearDown(self):
         del self.atomspace
         del self.hobbsAgent
 
     def getWord(self,name,type=types.WordInstanceNode):
-        rv=self.atomspace.get_atoms_by_name(type,name)
-        return rv[0]
+        word = self.atomspace.add_node(type, name)
+        return word
 
     def compare(self,list_1,list_2):
         if len(list_1)==len(list_2):
@@ -66,7 +54,6 @@ class AnaphoraUnitTester(TestCase):
         else:
             return False
 
-    @unittest.skip("Unit test disabled, see: https://github.com/opencog/opencog/issues/1280")
     def test_bfs(self):
 
         '''
@@ -92,7 +79,6 @@ class AnaphoraUnitTester(TestCase):
         self.assertTrue(self.compare(['a','b','c','d','e','f','g','h','j'],self.hobbsAgent.getWords()))
         self.atomspace.clear()
 
-    @unittest.skip("Unit test disabled, see: https://github.com/opencog/opencog/issues/1280")
     def test_propose(self):
 
         '''

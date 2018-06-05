@@ -1,11 +1,13 @@
 # ADD_DEFINITIONS(-DDEBUG)
 
 INCLUDE_DIRECTORIES (
-    ${ODBC_INCLUDE_DIRS}
+	${ODBC_INCLUDE_DIRS}
 )
 
 IF (${ODBC_FOUND})
-    LINK_LIBRARIES (wsd persist)
+	LINK_LIBRARIES (wsd
+		${ATOMSPACE_LIBRARIES}
+	)
 ENDIF (${ODBC_FOUND})
 
 ADD_LIBRARY (wsd SHARED
@@ -22,15 +24,18 @@ ADD_LIBRARY (wsd SHARED
 	SenseSimilarityLCH.cc
 	SenseSimilaritySQL.cc
 	Sweep.cc
-	WordSenseProcessor.cc
+# Do not build this any longer!
+#	WordSenseProcessor.cc
 )
 
 ADD_DEPENDENCIES(wsd nlp_atom_types)
 
+TARGET_LINK_LIBRARIES(wsd nlp-types)
+
 IF (HAVE_GUILE)
 	TARGET_LINK_LIBRARIES(wsd
-	 	${GUILE_LIBRARIES}
-		smob
+		${ATOMSPACE_smob_LIBRARY}
+		${GUILE_LIBRARIES}
 	)
 ENDIF (HAVE_GUILE)
 

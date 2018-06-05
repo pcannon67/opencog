@@ -15,12 +15,12 @@
 
 #include <opencog/atomspace/AtomSpace.h>
 #include <opencog/atomutils/ForeachChaseLink.h>
-#include <opencog/atomspace/Link.h>
-#include <opencog/atomspace/Node.h>
+#include <opencog/atoms/base/Link.h>
+#include <opencog/atoms/base/Node.h>
 #include <opencog/guile/SchemePrimitive.h>
 #include <opencog/nlp/types/atom_types.h>
 #include <opencog/nlp/wsd/MihalceaLabel.h>
-#include <opencog/server/CogServer.h>
+#include <opencog/cogserver/server/CogServer.h>
 
 #include "WordSenseProcessor.h"
 
@@ -77,7 +77,7 @@ void * WordSenseProcessor::thread_start(void *data)
 
 void WordSenseProcessor::work_thread(void)
 {
-	completion_handle = atom_space->addNode(ANCHOR_NODE, "#WSD_completed");
+	completion_handle = atom_space->add_node(ANCHOR_NODE, "#WSD_completed");
 
 	while (1)
 	{
@@ -95,10 +95,10 @@ void WordSenseProcessor::work_thread(void)
 		wsd->process_document(h);
 
 		// Mark this document as being completed.
-		std::vector<Handle> out;
+		HandleSeq out;
 		out.push_back(h);
 		out.push_back(completion_handle);
-		atom_space->addLink(INHERITANCE_LINK, out);
+		atom_space->add_link(INHERITANCE_LINK, out);
 	}
 }
 
@@ -130,7 +130,7 @@ bool WordSenseProcessor::do_document(const Handle& h)
 {
 	// Obtain the handle which indicates that the WSD processing of a
  	// document has started.
-	start_handle = atom_space->addNode(ANCHOR_NODE, "#WSD_started");
+	start_handle = atom_space->add_node(ANCHOR_NODE, "#WSD_started");
 
 	// Look to see if the document is associated with the
 	// start indicator.
@@ -143,10 +143,10 @@ bool WordSenseProcessor::do_document(const Handle& h)
 	printf ("WordSenseProcessor found document %d handle=%lx\n", cnt, h.value());
 
 	// Mark this document as being started.
-	std::vector<Handle> out;
+	HandleSeq out;
 	out.push_back(h);
 	out.push_back(start_handle);
-	atom_space->addLink(INHERITANCE_LINK, out);
+	atom_space->add_link(INHERITANCE_LINK, out);
 
 	// Now queue the document for actual processing.
 	pthread_mutex_lock(&queue_lock);

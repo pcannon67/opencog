@@ -11,8 +11,8 @@ LINK_DIRECTORIES(
 )
 
 LINK_LIBRARIES(
-	atomspace
-	server
+	${ATOMSPACE_LIBRARIES}
+	cogutil
 )
 
 ADD_CXXTEST(MicroplanningUTest)
